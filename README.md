@@ -8,7 +8,16 @@ switch bank and front keypad are all retained and driven directly from the Pi.
 
 ## Status
 
-Early development. See [the implementation plan](docs/superpowers/plans/2026-08-11-verbot-pi-ng.md).
+**Software complete and tested off-Pi; not yet run on the robot.**
+
+The state machine, HTTP API, speech, keypad and both hardware adapters are
+implemented with a passing test suite that needs no Raspberry Pi. What remains
+is physical bring-up: wiring the MCP23017 to the front panel, and working
+through the [bring-up checklist](docs/deployment.md#bring-up-checklist) to
+verify switch polarity, button order and the measured motor speeds.
+
+See [the implementation plan](docs/superpowers/plans/2026-08-11-verbot-pi-ng.md)
+for the task breakdown and deferred phase 2 work.
 
 ## Features
 
@@ -49,13 +58,12 @@ uv run ruff check  # lint
 
 ```bash
 sudo apt install espeak-ng
-uv sync --extra pi
-uv run verbot
+uv sync --extra pi --frozen
+VERBOT_USE_REAL_HARDWARE=true uv run verbot
 ```
 
-See [`config/config.txt.example`](config/config.txt.example) for the required
-device tree overlays and [`config/verbot.service`](config/verbot.service) for
-the systemd unit.
+Full instructions, including the required device tree overlays and the
+bring-up checklist, are in [`docs/deployment.md`](docs/deployment.md).
 
 ## Credits
 
