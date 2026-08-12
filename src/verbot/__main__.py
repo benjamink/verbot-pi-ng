@@ -48,6 +48,11 @@ def build_app(settings: Settings) -> FastAPI:
 
     app = create_app(controller=controller, speech=speech)
     app.router.lifespan_context = lifespan
+    # Expose the composed hardware for introspection and tests.
+    app.state.motor = motor
+    app.state.switches = switches
+    app.state.keypad = keypad
+    app.state.led = led
     return app
 
 
