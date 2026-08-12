@@ -20,7 +20,11 @@ class FakeMotor:
     def __init__(self) -> None:
         self.speed: int = 0
         self.speed_history: list[int] = []
+        self.opened = False
         self.closed = False
+
+    async def open(self) -> None:
+        self.opened = True
 
     async def set_speed_percent(self, percent: int) -> None:
         if not -100 <= percent <= 100:

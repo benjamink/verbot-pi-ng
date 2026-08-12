@@ -22,6 +22,9 @@ class LedPattern(StrEnum):
 
 
 class MotorDriver(Protocol):
+    async def open(self) -> None:
+        """Acquire the PWM channel and direction pin. Called once at startup."""
+
     async def set_speed_percent(self, percent: int) -> None:
         """Set speed as a percentage in [-100, 100]. Sign selects direction."""
 

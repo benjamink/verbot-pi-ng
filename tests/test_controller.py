@@ -28,6 +28,18 @@ async def test_starts_idle_with_motor_stopped(rig):
     assert motor.speed == 0
 
 
+async def test_start_opens_the_motor_and_switches(settings):
+    """The real motor exports its PWM channel in open(); skipping that leaves
+    a driver that silently does nothing."""
+    motor, switches = FakeMotor(), FakeSwitchBank()
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+
+    assert motor.opened
+    assert switches.started
+    await controller.close()
+
+
 async def test_request_begins_interrogation(rig):
     controller, motor, _ = rig
     await controller.request_action(Action.FORWARDS)

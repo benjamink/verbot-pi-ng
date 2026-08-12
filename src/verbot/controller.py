@@ -33,6 +33,7 @@ class Controller:
         self._timeout_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
+        await self._motor.open()
         self._switches.set_listener(self.handle_switch_event)
         await self._switches.start()
         await self._motor.set_speed_percent(0)
