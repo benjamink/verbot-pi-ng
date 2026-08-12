@@ -70,9 +70,22 @@ class Controller:
         await self._motor.set_speed_percent(self._settings.interrogation_speed)
 
     async def handle_switch_event(self, action: Action, activated: bool) -> None:
-        """Called by the switch bank whenever a gearbox switch opens or closes."""
+        """Called by the switch bank whenever a gearbox switch opens or closes.
+
+        Two events matter, and mode disambiguates them:
+
+        * INTERROGATING + closed + it is the one we want -> gears are in
+          position, start the action.
+        * ACTING + opened + it is the action we are running -> a mechanical
+          limit switch broke the circuit, so the action is finished.
+
+        Everything else is the drum sweeping past, and is ignored.
+        """
         if self._mode is Mode.INTERROGATING and activated and action is self._desired:
             await self._enter_action(action)
+        elif self._mode is Mode.ACTING and not activated and action is self._current:
+            log.info("limit switch reached for %s", action)
+            await self.request_action(Action.STOP)
 
     async def _enter_action(self, action: Action) -> None:
         self._cancel_timeout()

@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from verbot.actions import Action, Mode
@@ -94,3 +96,83 @@ async def test_switching_actions_re_enters_interrogation(rig):
     await switches.activate(Action.TALK)
     assert controller.status.mode is Mode.ACTING
     assert motor.speed == -100
+
+
+async def test_limit_switch_stops_a_running_action(rig):
+    """PICK_UP runs until the arm hits its stop, which breaks the switch
+    circuit. The controller must interrogate back to STOP."""
+    controller, motor, switches = rig
+    await controller.request_action(Action.PICK_UP)
+    await switches.sweep_to(Action.PICK_UP)
+    assert controller.status.mode is Mode.ACTING
+
+    await switches.release(Action.PICK_UP)
+
+    assert controller.status.mode is Mode.INTERROGATING
+    assert controller.status.desired_action is Action.STOP
+    assert motor.speed == 50
+
+    await switches.activate(Action.STOP)
+    assert controller.status.mode is Mode.IDLE
+    assert motor.speed == 0
+
+
+async def test_release_of_an_unrelated_switch_is_ignored(rig):
+    controller, motor, switches = rig
+    await controller.request_action(Action.FORWARDS)
+    await switches.sweep_to(Action.FORWARDS)
+
+    await switches.release(Action.TALK)
+
+    assert controller.status.mode is Mode.ACTING
+    assert motor.speed == -100
+
+
+async def test_interrogation_timeout_stops_the_motor(rig):
+    """A dirty switch that never closes must not leave the motor running."""
+    controller, motor, _ = rig
+    await controller.request_action(Action.TALK)
+    assert motor.speed == 50
+
+    await asyncio.sleep(0.1)  # settings.interrogation_timeout_s is 0.05
+
+    assert controller.status.mode is Mode.FAULT
+    assert controller.status.desired_action is None
+    assert motor.speed == 0
+
+
+async def test_reaching_the_switch_cancels_the_timeout(rig):
+    controller, motor, switches = rig
+    await controller.request_action(Action.FORWARDS)
+    await switches.sweep_to(Action.FORWARDS)
+
+    await asyncio.sleep(0.1)
+
+    assert controller.status.mode is Mode.ACTING
+    assert motor.speed == -100
+
+
+async def test_a_new_request_clears_a_fault(rig):
+    controller, motor, switches = rig
+    await controller.request_action(Action.TALK)
+    await asyncio.sleep(0.1)
+    assert controller.status.mode is Mode.FAULT
+
+    await controller.request_action(Action.FORWARDS)
+    assert controller.status.mode is Mode.INTERROGATING
+
+    await switches.sweep_to(Action.FORWARDS)
+    assert controller.status.mode is Mode.ACTING
+
+
+async def test_close_always_stops_the_motor(settings):
+    motor, switches = FakeMotor(), FakeSwitchBank()
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+    await controller.request_action(Action.FORWARDS)
+    assert motor.speed == 50
+
+    await controller.close()
+
+    assert motor.speed == 0
+    assert motor.closed and switches.closed
