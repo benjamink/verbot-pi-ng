@@ -1,0 +1,19 @@
+[Unit]
+Description=Verbot control server (verbot-pi-ng)
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=%i
+WorkingDirectory=/home/%i/verbot-pi-ng
+ExecStart=/home/%i/verbot-pi-ng/.venv/bin/verbot
+Restart=on-failure
+RestartSec=5
+
+# The motor must not be left running if the service dies.
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

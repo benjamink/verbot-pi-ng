@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Environments
+.venv/
+env/
+.env
+
+# uv
+# NOTE: uv.lock IS committed - it pins the deployed dependency set.
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
