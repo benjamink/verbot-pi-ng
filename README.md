@@ -42,7 +42,8 @@ for the task breakdown and deferred phase 2 work.
 
 Wiring, pin assignments and the reverse-engineered mechanical details are in
 [`docs/hardware.md`](docs/hardware.md), and the full schematic is at
-[`hardware/verbot-schematic.pdf`](hardware/verbot-schematic.pdf).
+[`hardware/verbot-schematic.pdf`](hardware/verbot-schematic.pdf)
+([SVG](hardware/verbot-schematic.svg)).
 
 ## Development
 

@@ -79,7 +79,9 @@ or add `Environment=` lines to the unit.
 ## Bring-up checklist
 
 Work through these in order, with the robot **on a stand with its wheels off
-the ground** until step 5 passes.
+the ground** until step 5 passes. Keep the schematic open while you do —
+[`hardware/verbot-schematic.pdf`](../hardware/verbot-schematic.pdf)
+([SVG](../hardware/verbot-schematic.svg)).
 
 | # | Check | Command / action | Expected |
 |---|-------|------------------|----------|

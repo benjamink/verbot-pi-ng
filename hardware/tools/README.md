@@ -23,3 +23,10 @@ cd hardware/tools
 python3 selftest.py            # check the geometry reader
 python3 generate_schematic.py  # regenerate (destructive)
 ```
+
+If you regenerate `verbot.kicad_sym` with `make_symbols.py`, run
+`kicad-cli sym upgrade --force ../verbot.kicad_sym` afterwards. `make_symbols.py`
+writes each pin's `(at ...)` on the same line as `(pin ...)`; `_PIN_RE` in
+`kicadgen.py` requires the newline-before-`(at` layout that only the upgrade
+pass produces, and without it `generate_schematic.py` fails with `KeyError:
+'1'` trying to look up a pin number that was never parsed.

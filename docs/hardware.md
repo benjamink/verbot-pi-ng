@@ -8,9 +8,10 @@
 > project and differ from the original.
 
 > 📐 **Schematic:** [`hardware/verbot-schematic.pdf`](../hardware/verbot-schematic.pdf)
-> — the full wiring on one sheet. Source: [`hardware/verbot.kicad_sch`](../hardware/verbot.kicad_sch)
-> (KiCad 10). The GPIO table below and `src/verbot/config.py` remain the pin-map
-> source of truth; the schematic reproduces them.
+> ([SVG](../hardware/verbot-schematic.svg)) — the full wiring on one sheet.
+> Source: [`hardware/verbot.kicad_sch`](../hardware/verbot.kicad_sch) (KiCad 10).
+> The GPIO table below and `src/verbot/config.py` remain the pin-map source of
+> truth; the schematic reproduces them.
 
 ## Electro-mechanical operation
 
