@@ -28,3 +28,12 @@ htmlcov/
 
 # OS
 .DS_Store
+
+# KiCad scratch
+*.kicad_prl
+*-backups/
+*-erc.rpt
+_autosave-*
+
+# superpowers SDD working files
+.superpowers/
