@@ -194,6 +194,53 @@ text_note(
 )
 
 # --------------------------------------------------------------------------
+# Motor: DRV8833 channel A
+# --------------------------------------------------------------------------
+
+drv = sym("verbot", "DRV8833_Carrier", "M2", "DRV8833 carrier", (330.2, 63.5))
+motor = sym("Motor", "Motor_DC", "M3", "Verbot 3V motor", (403.86, 76.2))
+c1 = sym("Device", "C_Polarized", "C1", "470uF", (292.1, 76.2))
+
+# Pi -> DRV8833. BCM numbers from src/verbot/config.py.
+MOTOR_NETS = [
+    ("32", "5", "MOTOR_IN1"),      # BCM12 PWM0  -> IN1
+    ("33", "6", "MOTOR_IN2"),      # BCM13 PWM1  -> IN2
+    ("31", "3", "MOTOR_nSLEEP"),   # BCM6        -> EEP
+    ("36", "4", "MOTOR_nFAULT"),   # BCM16       <- ULT
+]
+for pi_pin, drv_pin, net in MOTOR_NETS:
+    stub_label(pi[pi_pin], net, "R")
+    stub_label(drv[drv_pin], net, "L")
+
+stub_label(drv["1"], "+5V", "L")   # VCC
+stub_label(drv["2"], "GND", "L")   # GND
+
+# Bulk capacitance across the motor rail, at the carrier.
+label("+5V", c1["1"])
+label("GND", c1["2"])
+
+# Channel A out to the motor.
+stub_label(drv["7"], "MOTOR_A", "R")   # OUT1
+stub_label(drv["8"], "MOTOR_B", "R")   # OUT2
+stub_label(motor["1"], "MOTOR_A", "L")
+stub_label(motor["2"], "MOTOR_B", "L")
+
+# Channel B is unused.
+for drv_pin in ("9", "10", "11", "12"):   # IN3, IN4, OUT3, OUT4
+    nc(drv[drv_pin])
+
+text_note(
+    "MOTOR: only channel A is used.\\n"
+    "EEP may be tied to VCC by the carrier's J1 solder jumper - check with a\\n"
+    "meter. If bridged, set VERBOT_MOTOR_SLEEP_PIN=null and BCM6 stays free.\\n"
+    "If the motor runs backwards, swap OUT1/OUT2 rather than the code's sign\\n"
+    "convention: interrogation must be the positive direction.\\n"
+    "VCC is the motor rail, NOT a logic rail - the 3V motor sees whatever it\\n"
+    "is fed. Never feed it from the Pi's 3V3 pin.",
+    (292.1, 116.84),
+)
+
+# --------------------------------------------------------------------------
 # Emit
 # --------------------------------------------------------------------------
 
