@@ -828,7 +828,7 @@ git commit -m "feat(hardware): sheet generator and power tree"
 # --------------------------------------------------------------------------
 
 drv = sym("verbot", "DRV8833_Carrier", "M2", "DRV8833 carrier", (330.2, 63.5))
-motor = sym("Device", "Motor_DC", "M3", "Verbot 3V motor", (403.86, 76.2))
+motor = sym("Motor", "Motor_DC", "M3", "Verbot 3V motor", (403.86, 76.2))
 c1 = sym("Device", "C_Polarized", "C1", "470uF", (292.1, 76.2))
 
 # Pi -> DRV8833. BCM numbers from src/verbot/config.py.
@@ -882,7 +882,7 @@ cat hardware/verbot-erc.rpt
 Expected: no new violations beyond unclaimed Pi GPIO pins.
 
 If `Motor_DC` pin numbers are not `"1"` and `"2"`, run
-`python3 -c "import sys; sys.path.insert(0,'hardware/tools'); from kicadgen import pin_positions; print(pin_positions('Device','Motor_DC'))"`
+`python3 -c "import sys; sys.path.insert(0,'hardware/tools'); from kicadgen import pin_positions; print(pin_positions('Motor','Motor_DC'))"`
 and use the numbers it reports. Same technique for `C_Polarized`.
 
 - [ ] **Step 3: Commit**

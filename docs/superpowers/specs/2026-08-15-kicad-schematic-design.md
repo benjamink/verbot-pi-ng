@@ -60,7 +60,7 @@ Stock symbols for everything else:
 
 - `Connector:Raspberry_Pi_2_3` — the 40-pin header. Electrically identical on a
   Zero 2 W; the symbol name refers to the header pinout, not the board model.
-- `Device:Speaker`, `Device:Motor_DC`, `Device:LED`, `Device:R`,
+- `Device:Speaker`, `Motor:Motor_DC`, `Device:LED`, `Device:R`,
   `Device:C_Polarized`, `Switch:SW_Push`
 - `Connector:USB_B_Micro` for the power bank's cable into the OnOff SHIM,
   labelled as the 5V bank rather than drawn as a battery
@@ -109,7 +109,7 @@ gated on `MOTOR_nSLEEP` (extra part).
 | `MOTOR_nSLEEP` | 6 | 31 | `EEP` |
 | `MOTOR_nFAULT` | 16 | 36 | `ULT` |
 
-`OUT1`/`OUT2` to `Device:Motor_DC`. `IN3`/`IN4`/`OUT3`/`OUT4` get explicit
+`OUT1`/`OUT2` to `Motor:Motor_DC`. `IN3`/`IN4`/`OUT3`/`OUT4` get explicit
 no-connect flags — channel B is unused.
 
 Notes on the sheet: `EEP` may be tied to `VCC` by the carrier's `J1` solder
