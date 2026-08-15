@@ -239,7 +239,9 @@ for index, (net, at) in enumerate(
 text_note(
     "POWER: 5V USB bank -> OnOff SHIM -> Pi 5V rail and DRV8833 VCC.\\n"
     "Motor current therefore passes through the SHIM load switch (~2A).\\n"
-    "Cap VERBOT_ACTION_SPEED near +/-60 and rely on C1 for transients.",
+    "Cap VERBOT_ACTION_SPEED near +/-60 and rely on C1 for transients.\\n"
+    f"+5V: pins {','.join(PI_5V)} | +3V3: {','.join(PI_3V3)} | "
+    f"GND: {','.join(PI_GND)}",
     (25.4, 120.65),
 )
 
@@ -473,7 +475,9 @@ text_note(
     "Button order above is BUTTON_ORDER in hardware/mcp23017.py and is a\\n"
     "GUESS - reorder it at bring-up if a button triggers the wrong action.\\n"
     "R1 330R gives ~5mA from 3V3 through a red LED; MCP23017 sources 25mA.\\n"
-    "GPB1-7 float (driver sets them as inputs) - harmless.",
+    "GPB1-7 float (driver sets them as inputs) - harmless.\\n"
+    "INTA/INTB are no-connect: Mcp23017Keypad polls GPIOA at 50 Hz instead\\n"
+    "of using the interrupt line.",
     (12.7, 254.0),
 )
 
