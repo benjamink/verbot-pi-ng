@@ -38,6 +38,18 @@ def test_settings_read_from_env(monkeypatch):
     assert Settings().port == 9999
 
 
+def test_motor_sleep_pin_null_env_becomes_none(monkeypatch):
+    """VERBOT_MOTOR_SLEEP_PIN=null documents the DRV8833 J1-bridged case in
+    docs/hardware.md and docs/deployment.md; it must actually parse to None."""
+    monkeypatch.setenv("VERBOT_MOTOR_SLEEP_PIN", "null")
+    assert Settings().motor_sleep_pin is None
+
+
+def test_motor_fault_pin_null_env_becomes_none(monkeypatch):
+    monkeypatch.setenv("VERBOT_MOTOR_FAULT_PIN", "null")
+    assert Settings().motor_fault_pin is None
+
+
 def test_status_serialises_to_plain_strings():
     status = ControllerStatus(mode=Mode.ACTING, current_action=Action.FORWARDS, desired_action=None)
     assert status.model_dump() == {

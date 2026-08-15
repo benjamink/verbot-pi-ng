@@ -19,7 +19,9 @@ DEFAULT_SWITCH_PINS: dict[Action, int] = {
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="VERBOT_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="VERBOT_", env_file=".env", extra="ignore", env_parse_none_str="null"
+    )
 
     # HTTP server
     host: str = "0.0.0.0"
