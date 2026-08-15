@@ -327,6 +327,82 @@ text_note(
 )
 
 # --------------------------------------------------------------------------
+# Front panel: MCP23017 expander, 8 keypad buttons, status LED
+# --------------------------------------------------------------------------
+
+mcp = sym("verbot", "MCP23017_Breakout", "M6", "MCP23017 @ 0x20", (76.2, 165.1))
+
+stub_label(mcp["1"], "+3V3", "L")   # VDD
+stub_label(mcp["2"], "GND", "L")    # VSS
+stub_label(mcp["3"], "I2C_SDA", "L")
+stub_label(mcp["4"], "I2C_SCL", "L")
+stub_label(mcp["5"], "+3V3", "L")   # RESET held high
+
+# A0/A1/A2 to GND -> address 0x20, matching Settings.mcp23017_address.
+for mcp_pin in ("6", "7", "8"):
+    stub_label(mcp[mcp_pin], "GND", "L")
+
+# Interrupts unused: Mcp23017Keypad polls at 50 Hz.
+nc(mcp["9"])    # INTA
+nc(mcp["10"])   # INTB
+
+stub_label(pi["3"], "I2C_SDA", "L")   # BCM2
+stub_label(pi["5"], "I2C_SCL", "L")   # BCM3
+
+# GPA0-7 -> the eight original red buttons, common side to GND.
+# Order is BUTTON_ORDER in src/verbot/hardware/mcp23017.py.
+BUTTON_ORDER = [
+    "STOP",
+    "FORWARDS",
+    "REVERSE",
+    "ROTATE_LEFT",
+    "ROTATE_RIGHT",
+    "PICK_UP",
+    "PUT_DOWN",
+    "TALK",
+]
+for index, action in enumerate(BUTTON_ORDER):
+    mcp_pin = str(11 + index)          # GPA0 is pin 11 in the block symbol
+    net = f"BTN_{action}"
+    stub_label(mcp[mcp_pin], net, "R")
+    button = sym(
+        "Switch", "SW_Push", f"SW{index + 1}", action.lower(),
+        (12.7, round(139.7 + index * 10.16, 2)),
+    )
+    stub_label(button["1"], net, "L")
+    stub_label(button["2"], "GND", "R")
+
+# GPB0 -> series resistor -> status LED -> GND.
+led_r = sym("Device", "R", "R1", "330", (152.4, 165.1))
+led = sym("Device", "LED", "D1", "red status", (152.4, 180.34))
+stub_label(mcp["19"], "LED_DRIVE", "R")   # GPB0
+label("LED_DRIVE", led_r["1"])
+label("LED_A", led_r["2"])
+# pin_positions("Device", "LED") -> pin "1" is K (cathode), pin "2" is A
+# (anode). Anode gets the driven net; cathode goes to GND.
+label("LED_A", led["2"])
+label("GND", led["1"])
+
+# GPB1-7 are configured as inputs by the driver and left floating.
+for index in range(1, 8):
+    nc(mcp[str(19 + index)])
+
+text_note(
+    "FRONT PANEL - VERIFY BEFORE WIRING.\\n"
+    "This assumes the eight buttons are INDEPENDENT switches to a common rail.\\n"
+    "That has NOT been confirmed on the real panel. The original PCB also\\n"
+    "carried the power switching, so bypass it and solder to the switch\\n"
+    "contacts directly. Check with a meter first.\\n"
+    "\\n"
+    "GPA0-7 are inputs with MCP23017 pull-ups enabled: ACTIVE LOW.\\n"
+    "Button order above is BUTTON_ORDER in hardware/mcp23017.py and is a\\n"
+    "GUESS - reorder it at bring-up if a button triggers the wrong action.\\n"
+    "R1 330R gives ~5mA from 3V3 through a red LED; MCP23017 sources 25mA.\\n"
+    "GPB1-7 float (driver sets them as inputs) - harmless.",
+    (12.7, 254.0),
+)
+
+# --------------------------------------------------------------------------
 # Emit
 # --------------------------------------------------------------------------
 
