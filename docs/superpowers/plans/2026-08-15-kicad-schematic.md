@@ -735,8 +735,8 @@ for index, (net, at) in enumerate(
     label(net, flag["1"])
 
 text_note(
-    "POWER: 5V USB bank -> OnOff SHIM -> Pi 5V rail and DRV8833 VCC.\\n"
-    "Motor current therefore passes through the SHIM load switch (~2A).\\n"
+    "POWER: 5V USB bank -> OnOff SHIM -> Pi 5V rail and DRV8833 VCC.\n"
+    "Motor current therefore passes through the SHIM load switch (~2A).\n"
     "Cap VERBOT_ACTION_SPEED near +/-60 and rely on C1 for transients.",
     (25.4, 120.65),
 )
@@ -745,7 +745,7 @@ text_note(
 # Emit
 # --------------------------------------------------------------------------
 
-lib_cache = "\\n".join(_lib_symbol_any(lib, name) for lib, name in USED_SYMBOLS)
+lib_cache = "\n".join(_lib_symbol_any(lib, name) for lib, name in USED_SYMBOLS)
 
 DOC = f"""(kicad_sch
 	(version 20260306)
@@ -850,12 +850,12 @@ for drv_pin in ("9", "10", "11", "12"):   # IN3, IN4, OUT3, OUT4
     nc(drv[drv_pin])
 
 text_note(
-    "MOTOR: only channel A is used.\\n"
-    "EEP may be tied to VCC by the carrier's J1 solder jumper - check with a\\n"
-    "meter. If bridged, set VERBOT_MOTOR_SLEEP_PIN=null and BCM6 stays free.\\n"
-    "If the motor runs backwards, swap OUT1/OUT2 rather than the code's sign\\n"
-    "convention: interrogation must be the positive direction.\\n"
-    "VCC is the motor rail, NOT a logic rail - the 3V motor sees whatever it\\n"
+    "MOTOR: only channel A is used.\n"
+    "EEP may be tied to VCC by the carrier's J1 solder jumper - check with a\n"
+    "meter. If bridged, set VERBOT_MOTOR_SLEEP_PIN=null and BCM6 stays free.\n"
+    "If the motor runs backwards, swap OUT1/OUT2 rather than the code's sign\n"
+    "convention: interrogation must be the positive direction.\n"
+    "VCC is the motor rail, NOT a logic rail - the 3V motor sees whatever it\n"
     "is fed. Never feed it from the Pi's 3V3 pin.",
     (292.1, 116.84),
 )
@@ -924,22 +924,22 @@ stub_label(gearbox["10"], "MOTOR_A", "R")
 stub_label(gearbox["11"], "MOTOR_B", "R")
 
 text_note(
-    "INTERROGATION SWITCHES - all inputs, internal pull-ups, ACTIVE LOW.\\n"
-    "White is the common ground return for all eight.\\n"
-    "\\n"
-    "  colour   order  action         BCM  Pi pin\\n"
-    "  purple     1    stop            22    15\\n"
-    "  red        2    rotate right    26    37\\n"
-    "  yellow     3    rotate left     10    19\\n"
-    "  grey       4    forwards         9    21\\n"
-    "  blue       5    reverse         25    22\\n"
-    "  brown      6    put down        11    23\\n"
-    "  orange     7    pick up          8    24\\n"
-    "  green      8    talk             7    26\\n"
-    "\\n"
-    "ARM LIMIT SWITCHES are in series inside the gearbox on BROWN and ORANGE.\\n"
-    "When an arm reaches its travel limit that circuit OPENS - the controller\\n"
-    "sees the switch release mid-action and stops. Without it the mechanism\\n"
+    "INTERROGATION SWITCHES - all inputs, internal pull-ups, ACTIVE LOW.\n"
+    "White is the common ground return for all eight.\n"
+    "\n"
+    "  colour   order  action         BCM  Pi pin\n"
+    "  purple     1    stop            22    15\n"
+    "  red        2    rotate right    26    37\n"
+    "  yellow     3    rotate left     10    19\n"
+    "  grey       4    forwards         9    21\n"
+    "  blue       5    reverse         25    22\n"
+    "  brown      6    put down        11    23\n"
+    "  orange     7    pick up          8    24\n"
+    "  green      8    talk             7    26\n"
+    "\n"
+    "ARM LIMIT SWITCHES are in series inside the gearbox on BROWN and ORANGE.\n"
+    "When an arm reaches its travel limit that circuit OPENS - the controller\n"
+    "sees the switch release mid-action and stops. Without it the mechanism\n"
     "strains against its stop.",
     (241.3, 215.9),
 )
@@ -1023,10 +1023,10 @@ stub_label(spk["1"], "SPK_P", "L")
 stub_label(spk["2"], "SPK_N", "L")
 
 text_note(
-    "AUDIO: MAX98357A on BCM18 (BCLK), 19 (LRCLK), 21 (DIN).\\n"
-    "SD_MODE is left floating on the breakout's own pull-up. That is what the\\n"
-    "no-sdmode flag in config/config.txt.example selects - without it the\\n"
-    "overlay claims BCM4, which the OnOff SHIM needs for shutdown.\\n"
+    "AUDIO: MAX98357A on BCM18 (BCLK), 19 (LRCLK), 21 (DIN).\n"
+    "SD_MODE is left floating on the breakout's own pull-up. That is what the\n"
+    "no-sdmode flag in config/config.txt.example selects - without it the\n"
+    "overlay claims BCM4, which the OnOff SHIM needs for shutdown.\n"
     "GAIN floating = 9dB default. Speaker must be PASSIVE, 4-8 ohm.",
     (63.5, 254.0),
 )
@@ -1123,16 +1123,16 @@ for index in range(1, 8):
     nc(mcp[str(19 + index)])
 
 text_note(
-    "FRONT PANEL - VERIFY BEFORE WIRING.\\n"
-    "This assumes the eight buttons are INDEPENDENT switches to a common rail.\\n"
-    "That has NOT been confirmed on the real panel. The original PCB also\\n"
-    "carried the power switching, so bypass it and solder to the switch\\n"
-    "contacts directly. Check with a meter first.\\n"
-    "\\n"
-    "GPA0-7 are inputs with MCP23017 pull-ups enabled: ACTIVE LOW.\\n"
-    "Button order above is BUTTON_ORDER in hardware/mcp23017.py and is a\\n"
-    "GUESS - reorder it at bring-up if a button triggers the wrong action.\\n"
-    "R1 330R gives ~5mA from 3V3 through a red LED; MCP23017 sources 25mA.\\n"
+    "FRONT PANEL - VERIFY BEFORE WIRING.\n"
+    "This assumes the eight buttons are INDEPENDENT switches to a common rail.\n"
+    "That has NOT been confirmed on the real panel. The original PCB also\n"
+    "carried the power switching, so bypass it and solder to the switch\n"
+    "contacts directly. Check with a meter first.\n"
+    "\n"
+    "GPA0-7 are inputs with MCP23017 pull-ups enabled: ACTIVE LOW.\n"
+    "Button order above is BUTTON_ORDER in hardware/mcp23017.py and is a\n"
+    "GUESS - reorder it at bring-up if a button triggers the wrong action.\n"
+    "R1 330R gives ~5mA from 3V3 through a red LED; MCP23017 sources 25mA.\n"
     "GPB1-7 float (driver sets them as inputs) - harmless.",
     (12.7, 254.0),
 )
@@ -1205,7 +1205,7 @@ for number in pi:
         nc(pi[number])
 
 text_note(
-    "FREE GPIO after this build: BCM 5, 14, 15, 20, 23, 24.\\n"
+    "FREE GPIO after this build: BCM 5, 14, 15, 20, 23, 24.\n"
     "Unused header pins carry no-connect flags so ERC stays meaningful.",
     (215.9, 254.0),
 )
