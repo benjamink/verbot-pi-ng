@@ -403,6 +403,30 @@ text_note(
 )
 
 # --------------------------------------------------------------------------
+# Unused header pins
+# --------------------------------------------------------------------------
+
+# Every Pi pin claimed above, so the rest can be no-connected without guessing.
+CLAIMED = set(
+    PI_5V + PI_3V3 + PI_GND
+    + ["11", "13", "7"]                                  # OnOff SHIM
+    + [pi_pin for pi_pin, _, _ in MOTOR_NETS]            # DRV8833
+    + [pi_pin for _, _, pi_pin, _, _, _ in SWITCHES]     # switch bank
+    + [pi_pin for pi_pin, _, _ in I2S_NETS]              # I2S DAC
+    + ["3", "5"]                                         # I2C
+)
+
+for number in pi:
+    if number not in CLAIMED:
+        nc(pi[number])
+
+text_note(
+    "FREE GPIO after this build: BCM 5, 14, 15, 20, 23, 24.\\n"
+    "Unused header pins carry no-connect flags so ERC stays meaningful.",
+    (215.9, 254.0),
+)
+
+# --------------------------------------------------------------------------
 # Emit
 # --------------------------------------------------------------------------
 
