@@ -48,6 +48,29 @@ def test_assert_grid_rejects_off_grid_points():
     raise AssertionError("assert_grid accepted an off-grid point")
 
 
+def test_project_library_has_all_five_symbols():
+    text = open("../verbot.kicad_sym").read()
+    for name in (
+        "DRV8833_Carrier",
+        "MAX98357A_Breakout",
+        "MCP23017_Breakout",
+        "OnOff_SHIM",
+        "Verbot_Gearbox",
+    ):
+        assert f'(symbol "{name}"' in text, f"missing symbol {name}"
+
+
+def test_project_library_is_balanced():
+    text = open("../verbot.kicad_sym").read()
+    assert text.count("(") == text.count(")"), "unbalanced parens"
+
+
+def test_gearbox_names_pins_by_wire_colour():
+    text = open("../verbot.kicad_sym").read()
+    for colour in ("PURPLE", "RED", "YELLOW", "GREY", "BLUE", "BROWN", "ORANGE", "GREEN"):
+        assert f'(name "{colour}"' in text, f"missing gearbox pin {colour}"
+
+
 if __name__ == "__main__":
     failures = 0
     for name, fn in sorted(globals().items()):
