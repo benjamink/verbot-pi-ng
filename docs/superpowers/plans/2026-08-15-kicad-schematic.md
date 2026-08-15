@@ -18,6 +18,7 @@ Spec: `docs/superpowers/specs/2026-08-15-kicad-schematic-design.md`
 - `lib_symbols` must embed a full copy of every symbol used, re-keyed from `(symbol "NAME"` to `(symbol "Lib:NAME"`.
 - Every externally-driven power net (`+5V`, `+3V3`, `GND`) needs a `power:PWR_FLAG` connected to it, or ERC raises `power_pin_not_driven` as an **error**.
 - Every `no_connect` flag must sit exactly on a pin coordinate, or ERC raises `no_connect_dangling` as a warning.
+- **Line breaks inside a `text_note` body must be written `\n` in the Python source** (a literal backslash-n), so the emitted file carries the two-character `\n` escape KiCad expects inside a quoted string. A real newline character inside a quoted S-expression string makes the file unparseable — `kicad-cli` reports `Failed to load schematic`, verified empirically. This applies only to string *contents*; joins that separate top-level blocks (`lib_cache`, `BODY`) need real newlines.
 - Acceptance gate for every task from Task 3 onward: `kicad-cli sch erc --severity-all --exit-code-violations hardware/verbot.kicad_sch` exits 0 and reports `0 Errors 0 Warnings`.
 - No changes to any file under `src/` or `tests/`. This task adds no Python runtime dependencies.
 - Pin assignments come from `src/verbot/config.py` and `docs/hardware.md`. Do not invent any.
@@ -702,6 +703,13 @@ usb = sym("Connector", "USB_B_Micro", "J2", "5V USB power bank", (19.05, 63.5))
 stub_label(usb["1"], "VBUS_IN", "R")
 stub_label(usb["5"], "GND", "R")
 
+# This is a power-only connection to a USB power bank; the data/ID/shield
+# pins are intentionally unused, and J2 is not touched by any later task.
+nc(usb["2"])  # D-
+nc(usb["3"])  # D+
+nc(usb["4"])  # ID
+nc(usb["SH"])  # Shield
+
 # Pi power pins. Pin numbers are physical header positions.
 PI_5V = ["2", "4"]
 PI_3V3 = ["1", "17"]
@@ -727,16 +735,18 @@ stub_label(pi["13"], "SHIM_LED", "L")
 stub_label(pi["7"], "SHIM_POWEROFF", "L")
 
 # Power flags. Without one per externally-driven net, ERC errors with
-# power_pin_not_driven.
+# power_pin_not_driven. GND does not need one: the stock USB_B_Micro symbol
+# types its pin 5 as a power output, so GND is already driven and adding a
+# PWR_FLAG there trips a pin_to_pin "two power outputs" conflict instead.
 for index, (net, at) in enumerate(
-    [("+5V", (44.45, 105.41)), ("+3V3", (69.85, 105.41)), ("GND", (95.25, 105.41))]
+    [("+5V", (44.45, 105.41)), ("+3V3", (69.85, 105.41))]
 ):
     flag = sym("power", "PWR_FLAG", f"#FLG0{index + 1}", "PWR_FLAG", at, hide_value=True)
     label(net, flag["1"])
 
 text_note(
-    "POWER: 5V USB bank -> OnOff SHIM -> Pi 5V rail and DRV8833 VCC.\n"
-    "Motor current therefore passes through the SHIM load switch (~2A).\n"
+    "POWER: 5V USB bank -> OnOff SHIM -> Pi 5V rail and DRV8833 VCC.\\n"
+    "Motor current therefore passes through the SHIM load switch (~2A).\\n"
     "Cap VERBOT_ACTION_SPEED near +/-60 and rely on C1 for transients.",
     (25.4, 120.65),
 )
@@ -850,12 +860,12 @@ for drv_pin in ("9", "10", "11", "12"):   # IN3, IN4, OUT3, OUT4
     nc(drv[drv_pin])
 
 text_note(
-    "MOTOR: only channel A is used.\n"
-    "EEP may be tied to VCC by the carrier's J1 solder jumper - check with a\n"
-    "meter. If bridged, set VERBOT_MOTOR_SLEEP_PIN=null and BCM6 stays free.\n"
-    "If the motor runs backwards, swap OUT1/OUT2 rather than the code's sign\n"
-    "convention: interrogation must be the positive direction.\n"
-    "VCC is the motor rail, NOT a logic rail - the 3V motor sees whatever it\n"
+    "MOTOR: only channel A is used.\\n"
+    "EEP may be tied to VCC by the carrier's J1 solder jumper - check with a\\n"
+    "meter. If bridged, set VERBOT_MOTOR_SLEEP_PIN=null and BCM6 stays free.\\n"
+    "If the motor runs backwards, swap OUT1/OUT2 rather than the code's sign\\n"
+    "convention: interrogation must be the positive direction.\\n"
+    "VCC is the motor rail, NOT a logic rail - the 3V motor sees whatever it\\n"
     "is fed. Never feed it from the Pi's 3V3 pin.",
     (292.1, 116.84),
 )
@@ -924,22 +934,22 @@ stub_label(gearbox["10"], "MOTOR_A", "R")
 stub_label(gearbox["11"], "MOTOR_B", "R")
 
 text_note(
-    "INTERROGATION SWITCHES - all inputs, internal pull-ups, ACTIVE LOW.\n"
-    "White is the common ground return for all eight.\n"
-    "\n"
-    "  colour   order  action         BCM  Pi pin\n"
-    "  purple     1    stop            22    15\n"
-    "  red        2    rotate right    26    37\n"
-    "  yellow     3    rotate left     10    19\n"
-    "  grey       4    forwards         9    21\n"
-    "  blue       5    reverse         25    22\n"
-    "  brown      6    put down        11    23\n"
-    "  orange     7    pick up          8    24\n"
-    "  green      8    talk             7    26\n"
-    "\n"
-    "ARM LIMIT SWITCHES are in series inside the gearbox on BROWN and ORANGE.\n"
-    "When an arm reaches its travel limit that circuit OPENS - the controller\n"
-    "sees the switch release mid-action and stops. Without it the mechanism\n"
+    "INTERROGATION SWITCHES - all inputs, internal pull-ups, ACTIVE LOW.\\n"
+    "White is the common ground return for all eight.\\n"
+    "\\n"
+    "  colour   order  action         BCM  Pi pin\\n"
+    "  purple     1    stop            22    15\\n"
+    "  red        2    rotate right    26    37\\n"
+    "  yellow     3    rotate left     10    19\\n"
+    "  grey       4    forwards         9    21\\n"
+    "  blue       5    reverse         25    22\\n"
+    "  brown      6    put down        11    23\\n"
+    "  orange     7    pick up          8    24\\n"
+    "  green      8    talk             7    26\\n"
+    "\\n"
+    "ARM LIMIT SWITCHES are in series inside the gearbox on BROWN and ORANGE.\\n"
+    "When an arm reaches its travel limit that circuit OPENS - the controller\\n"
+    "sees the switch release mid-action and stops. Without it the mechanism\\n"
     "strains against its stop.",
     (241.3, 215.9),
 )
@@ -1023,10 +1033,10 @@ stub_label(spk["1"], "SPK_P", "L")
 stub_label(spk["2"], "SPK_N", "L")
 
 text_note(
-    "AUDIO: MAX98357A on BCM18 (BCLK), 19 (LRCLK), 21 (DIN).\n"
-    "SD_MODE is left floating on the breakout's own pull-up. That is what the\n"
-    "no-sdmode flag in config/config.txt.example selects - without it the\n"
-    "overlay claims BCM4, which the OnOff SHIM needs for shutdown.\n"
+    "AUDIO: MAX98357A on BCM18 (BCLK), 19 (LRCLK), 21 (DIN).\\n"
+    "SD_MODE is left floating on the breakout's own pull-up. That is what the\\n"
+    "no-sdmode flag in config/config.txt.example selects - without it the\\n"
+    "overlay claims BCM4, which the OnOff SHIM needs for shutdown.\\n"
     "GAIN floating = 9dB default. Speaker must be PASSIVE, 4-8 ohm.",
     (63.5, 254.0),
 )
@@ -1123,16 +1133,16 @@ for index in range(1, 8):
     nc(mcp[str(19 + index)])
 
 text_note(
-    "FRONT PANEL - VERIFY BEFORE WIRING.\n"
-    "This assumes the eight buttons are INDEPENDENT switches to a common rail.\n"
-    "That has NOT been confirmed on the real panel. The original PCB also\n"
-    "carried the power switching, so bypass it and solder to the switch\n"
-    "contacts directly. Check with a meter first.\n"
-    "\n"
-    "GPA0-7 are inputs with MCP23017 pull-ups enabled: ACTIVE LOW.\n"
-    "Button order above is BUTTON_ORDER in hardware/mcp23017.py and is a\n"
-    "GUESS - reorder it at bring-up if a button triggers the wrong action.\n"
-    "R1 330R gives ~5mA from 3V3 through a red LED; MCP23017 sources 25mA.\n"
+    "FRONT PANEL - VERIFY BEFORE WIRING.\\n"
+    "This assumes the eight buttons are INDEPENDENT switches to a common rail.\\n"
+    "That has NOT been confirmed on the real panel. The original PCB also\\n"
+    "carried the power switching, so bypass it and solder to the switch\\n"
+    "contacts directly. Check with a meter first.\\n"
+    "\\n"
+    "GPA0-7 are inputs with MCP23017 pull-ups enabled: ACTIVE LOW.\\n"
+    "Button order above is BUTTON_ORDER in hardware/mcp23017.py and is a\\n"
+    "GUESS - reorder it at bring-up if a button triggers the wrong action.\\n"
+    "R1 330R gives ~5mA from 3V3 through a red LED; MCP23017 sources 25mA.\\n"
     "GPB1-7 float (driver sets them as inputs) - harmless.",
     (12.7, 254.0),
 )
@@ -1205,7 +1215,7 @@ for number in pi:
         nc(pi[number])
 
 text_note(
-    "FREE GPIO after this build: BCM 5, 14, 15, 20, 23, 24.\n"
+    "FREE GPIO after this build: BCM 5, 14, 15, 20, 23, 24.\\n"
     "Unused header pins carry no-connect flags so ERC stays meaningful.",
     (215.9, 254.0),
 )
