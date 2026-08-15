@@ -289,6 +289,44 @@ text_note(
 )
 
 # --------------------------------------------------------------------------
+# Audio: MAX98357A I2S DAC / amplifier
+# --------------------------------------------------------------------------
+
+dac = sym("verbot", "MAX98357A_Breakout", "M5", "MAX98357A I2S DAC", (144.78, 215.9))
+spk = sym("Device", "Speaker", "LS1", "4-8 ohm passive", (63.5, 228.6))
+
+stub_label(dac["1"], "+5V", "L")   # VIN
+stub_label(dac["2"], "GND", "L")   # GND
+
+# Pi I2S -> DAC.
+I2S_NETS = [
+    ("12", "6", "I2S_BCLK"),    # BCM18 -> BCLK
+    ("35", "7", "I2S_LRCLK"),   # BCM19 -> LRC
+    ("40", "5", "I2S_DIN"),     # BCM21 -> DIN
+]
+for pi_pin, dac_pin, net in I2S_NETS:
+    stub_label(pi[pi_pin], net, "L")
+    stub_label(dac[dac_pin], net, "R")
+
+# SD and GAIN ride the breakout's own pull-ups.
+nc(dac["3"])   # SD
+nc(dac["4"])   # GAIN
+
+stub_label(dac["8"], "SPK_P", "R")
+stub_label(dac["9"], "SPK_N", "R")
+stub_label(spk["1"], "SPK_P", "L")
+stub_label(spk["2"], "SPK_N", "L")
+
+text_note(
+    "AUDIO: MAX98357A on BCM18 (BCLK), 19 (LRCLK), 21 (DIN).\\n"
+    "SD_MODE is left floating on the breakout's own pull-up. That is what the\\n"
+    "no-sdmode flag in config/config.txt.example selects - without it the\\n"
+    "overlay claims BCM4, which the OnOff SHIM needs for shutdown.\\n"
+    "GAIN floating = 9dB default. Speaker must be PASSIVE, 4-8 ohm.",
+    (63.5, 254.0),
+)
+
+# --------------------------------------------------------------------------
 # Emit
 # --------------------------------------------------------------------------
 
