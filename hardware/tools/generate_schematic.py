@@ -10,11 +10,13 @@ manageable.
 """
 
 from kicadgen import (
-    Pin,
+    PropertyPlacement,
     absolute_pin,
     assert_grid,
+    grid_out,
     lib_symbol,
     pin_positions,
+    property_placements,
     uid,
 )
 
@@ -35,13 +37,41 @@ def use(lib: str, name: str) -> str:
     return f"{lib}:{name}"
 
 
-def sym(lib, name, ref, value, at, rot=0, hide_value=False):
-    """Place a symbol instance and return its pin-position lookup."""
+def _property_field(kind, text, at, place, hide=False):
+    """One (property ...) line, positioned where the library asks.
+
+    Symbol Y is inverted relative to schematic Y - the same flip absolute_pin()
+    does for pins - so a library offset of +dy prints above the origin.
+    """
+    px = round(at[0] + place.dx, 2)
+    py = round(at[1] - place.dy, 2)
+    assert_grid((px, py))
+    justify = f" (justify {place.justify})" if place.justify else ""
+    hidden = " (hide yes)" if hide or place.hide else ""
+    return (
+        f'\t\t(property "{kind}" "{text}" (at {px} {py} {place.rot})\n'
+        f"\t\t\t(effects (font (size 1.27 1.27)){justify}{hidden}))"
+    )
+
+
+def sym(lib, name, ref, value, at, rot=0, hide_value=False, value_offset=None):
+    """Place a symbol instance and return its pin-position lookup.
+
+    Reference and Value text default to the offsets the library itself
+    declares, which every symbol here places clear of its own body. Pass
+    value_offset=(dx, dy, rot) only where the library default is unusable -
+    Device:R parks its value at (0, 0), dead centre of the resistor.
+    """
     lib_id = use(lib, name)
-    pins = pin_positions(lib, name) if lib != "verbot" else _project_pins(name)
+    pins = _from_library(pin_positions, lib, name)
+    places = _from_library(property_placements, lib, name)
     x, y = at
     assert_grid(at)
-    value_effects = "(hide yes)" if hide_value else ""
+    ref_place = places["Reference"]
+    value_place = places["Value"]
+    if value_offset is not None:
+        dx, dy, value_rot = value_offset
+        value_place = PropertyPlacement(grid_out(dx), grid_out(dy), value_rot, "", False)
     pin_blocks = "\n".join(f'\t\t(pin "{n}" (uuid "{uid()}"))' for n in pins)
     BODY.append(
         f"""	(symbol
@@ -53,10 +83,8 @@ def sym(lib, name, ref, value, at, rot=0, hide_value=False):
 		(on_board yes)
 		(dnp no)
 		(uuid "{uid()}")
-		(property "Reference" "{ref}" (at {x} {y - 2.54} 0)
-			(effects (font (size 1.27 1.27)) (justify left)))
-		(property "Value" "{value}" (at {x} {y + 2.54} 0)
-			(effects (font (size 1.27 1.27)) (justify left) {value_effects}))
+{_property_field("Reference", ref, at, ref_place)}
+{_property_field("Value", value, at, value_place, hide=hide_value)}
 {pin_blocks}
 		(instances
 			(project "{PROJECT}"
@@ -66,14 +94,16 @@ def sym(lib, name, ref, value, at, rot=0, hide_value=False):
     return {number: absolute_pin(at, pin) for number, pin in pins.items()}
 
 
-def _project_pins(name: str) -> dict[str, Pin]:
-    """pin_positions() for the project library, which is not in SYMBOL_DIR."""
+def _from_library(reader, lib: str, name: str):
+    """Run a kicadgen library reader, resolving "verbot" to ../verbot.kicad_sym."""
     import kicadgen
 
+    if lib != "verbot":
+        return reader(lib, name)
     original = kicadgen.SYMBOL_DIR
     kicadgen.SYMBOL_DIR = ".."
     try:
-        return kicadgen.pin_positions("verbot", name)
+        return reader(lib, name)
     finally:
         kicadgen.SYMBOL_DIR = original
 
@@ -123,16 +153,7 @@ def stub_label(pin_xy, net, direction):
 
 def _lib_symbol_any(lib, name):
     """lib_symbol() that also resolves the project library at ../verbot.kicad_sym."""
-    import kicadgen
-
-    if lib != "verbot":
-        return lib_symbol(lib, name)
-    original = kicadgen.SYMBOL_DIR
-    kicadgen.SYMBOL_DIR = ".."
-    try:
-        return kicadgen.lib_symbol(lib, name)
-    finally:
-        kicadgen.SYMBOL_DIR = original
+    return _from_library(lib_symbol, lib, name)
 
 
 # --------------------------------------------------------------------------
@@ -141,14 +162,7 @@ def _lib_symbol_any(lib, name):
 
 PI_AT = (215.9, 148.59)
 
-pi = sym(
-    "Connector",
-    "Raspberry_Pi_2_3",
-    "J1",
-    "Raspberry Pi Zero 2 W",
-    PI_AT,
-    hide_value=True,  # default Value offset lands inside the tall header body
-)
+pi = sym("Connector", "Raspberry_Pi_2_3", "J1", "Raspberry Pi Zero 2 W", PI_AT)
 _pi_pin_rot = {n: p.rot for n, p in pin_positions("Connector", "Raspberry_Pi_2_3").items()}
 
 
@@ -173,14 +187,7 @@ def pi_side(number: str) -> str:
 # symbol's own net labels reach almost 12mm outward, so anything closer would
 # have "VBUS_IN" from J2 and "VBUS_IN" from M1 print on top of each other.
 shim = sym("verbot", "OnOff_SHIM", "M1", "Pimoroni OnOff SHIM", (82.55, 63.5))
-usb = sym(
-    "Connector",
-    "USB_B_Micro",
-    "J2",
-    "5V USB power bank",
-    (19.05, 63.5),
-    hide_value=True,  # default Value offset lands exactly on pin 2 (D-)
-)
+usb = sym("Connector", "USB_B_Micro", "J2", "5V USB power bank", (19.05, 63.5))
 
 # USB bank -> SHIM. VBUS is pin 1 and shield/GND pin 5 on USB_B_Micro; confirm
 # with pin_positions("Connector", "USB_B_Micro") and adjust if the stock symbol
@@ -241,7 +248,10 @@ text_note(
 # --------------------------------------------------------------------------
 
 drv = sym("verbot", "DRV8833_Carrier", "M2", "DRV8833 carrier", (330.2, 63.5))
-motor = sym("Motor", "Motor_DC", "M3", "Verbot 3V motor", (403.86, 76.2))
+# x=384.81 (not 403.86): Motor_DC prints its value to the RIGHT of the body,
+# and "Verbot 3V motor" from 403.86 ran clean off the right edge of the sheet.
+# The drawing area ends at x=408; from here the value stops around x=404.
+motor = sym("Motor", "Motor_DC", "M3", "Verbot 3V motor", (384.81, 76.2))
 c1 = sym("Device", "C_Polarized", "C1", "470uF", (292.1, 76.2))
 
 # Pi -> DRV8833. BCM numbers from src/verbot/config.py.
@@ -378,10 +388,13 @@ text_note(
 # Front panel: MCP23017 expander, 8 keypad buttons, status LED
 # --------------------------------------------------------------------------
 
-# x=91.44 (not 76.2): the button column below needs room to clear the sheet's
+# x=104.14 (not 76.2): the button column below needs room to clear the sheet's
 # left edge, and MCP23017's own left-side labels (I2C_SDA etc) need to stay
 # clear of the buttons' rightward GND labels in turn - see BUTTON_ORDER below.
-mcp = sym("verbot", "MCP23017_Breakout", "M6", "MCP23017 @ 0x20", (91.44, 165.1))
+# Those labels are ~7.6mm wide and start at x=58.4 from here; the buttons' GND
+# labels stop at x=53.2, so the two columns clear each other by ~5mm. At the
+# previous x=91.44 they printed straight through one another.
+mcp = sym("verbot", "MCP23017_Breakout", "M6", "MCP23017 @ 0x20", (104.14, 165.1))
 
 stub_label(mcp["1"], "+3V3", "L")   # VDD
 stub_label(mcp["2"], "GND", "L")    # VSS
@@ -427,15 +440,23 @@ for index, action in enumerate(BUTTON_ORDER):
     stub_label(button["2"], "GND", "R")
 
 # GPB0 -> series resistor -> status LED -> GND.
-led_r = sym("Device", "R", "R1", "330", (152.4, 165.1))
-led = sym("Device", "LED", "D1", "red status", (152.4, 180.34))
+# x=160.02 sits between the MCP23017's rightward BTN_* labels (which stop at
+# ~x=159.7) and the Pi header's leftward labels (which start at ~x=175.4).
+# Device:R declares its Value at (0, 0) - the middle of the resistor body, on
+# top of the R1 reference - so "330" is pushed below the symbol instead.
+led_r = sym("Device", "R", "R1", "330", (160.02, 165.1), value_offset=(0, -6.35, 0))
+# Device:LED's own value offset (-2.54) puts "red status" through the emission
+# arrows, which are drawn below and left of the body; drop it clear of them.
+led = sym("Device", "LED", "D1", "red status", (160.02, 180.34), value_offset=(0, -6.35, 0))
 stub_label(mcp["19"], "LED_DRIVE", "R")   # GPB0
 label("LED_DRIVE", led_r["1"])
 label("LED_A", led_r["2"])
 # pin_positions("Device", "LED") -> pin "1" is K (cathode), pin "2" is A
 # (anode). Anode gets the driven net; cathode goes to GND.
 label("LED_A", led["2"])
-label("GND", led["1"])
+# Right-justified: the cathode is the LEFT pin, so a left-justified label here
+# grows back over the diode's own graphic.
+label("GND", led["1"], justify="right")
 
 # GPB1-7 are configured as inputs by the driver and left floating.
 for index in range(1, 8):
