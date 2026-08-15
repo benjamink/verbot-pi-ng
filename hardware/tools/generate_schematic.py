@@ -86,11 +86,11 @@ def wire(start, end):
     )
 
 
-def label(text, at, rot=0):
+def label(text, at, rot=0, justify="left"):
     assert_grid(at)
     BODY.append(
         f"""	(label "{text}" (at {at[0]} {at[1]} {rot})
-		(effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "{uid()}"))"""
+		(effects (font (size 1.27 1.27)) (justify {justify})) (uuid "{uid()}"))"""
     )
 
 
@@ -108,11 +108,17 @@ def text_note(body, at, size=1.27):
 
 
 def stub_label(pin_xy, net, direction):
-    """Draw a short stub off a pin and label it. direction: 'L' or 'R'."""
+    """Draw a short stub off a pin and label it. direction: 'L' or 'R'.
+
+    The label text must grow away from the stub's own pin, not back over it:
+    a stub that runs left needs right-justified text (grows further left),
+    and one running right needs left-justified text (grows further right).
+    """
     dx = -STUB if direction == "L" else STUB
     end = (round(pin_xy[0] + dx, 2), pin_xy[1])
     wire(pin_xy, end)
-    label(net, end)
+    justify = "right" if direction == "L" else "left"
+    label(net, end, justify=justify)
 
 
 def _lib_symbol_any(lib, name):
@@ -135,9 +141,46 @@ def _lib_symbol_any(lib, name):
 
 PI_AT = (215.9, 148.59)
 
-pi = sym("Connector", "Raspberry_Pi_2_3", "J1", "Raspberry Pi Zero 2 W", PI_AT)
-shim = sym("verbot", "OnOff_SHIM", "M1", "Pimoroni OnOff SHIM", (69.85, 63.5))
-usb = sym("Connector", "USB_B_Micro", "J2", "5V USB power bank", (19.05, 63.5))
+pi = sym(
+    "Connector",
+    "Raspberry_Pi_2_3",
+    "J1",
+    "Raspberry Pi Zero 2 W",
+    PI_AT,
+    hide_value=True,  # default Value offset lands inside the tall header body
+)
+_pi_pin_rot = {n: p.rot for n, p in pin_positions("Connector", "Raspberry_Pi_2_3").items()}
+
+
+def pi_side(number: str) -> str:
+    """Which way a Pi header pin's own connection point faces.
+
+    rot 0 pins face left; rot 180 pins face right. stub_label() needs this
+    per pin - the header's left/right columns interleave BCM numbers, so a
+    direction that is correct for one claimed pin in a net group is often
+    backwards for the next, driving the stub into the header body instead
+    of away from it.
+    """
+    rot = _pi_pin_rot[number]
+    if rot == 0:
+        return "L"
+    if rot == 180:
+        return "R"
+    raise ValueError(f"pin {number} is vertical (rot={rot}); pass a direction explicitly")
+
+
+# M1 sits further from J2 than the 50.8mm centre-to-centre gap suggests: each
+# symbol's own net labels reach almost 12mm outward, so anything closer would
+# have "VBUS_IN" from J2 and "VBUS_IN" from M1 print on top of each other.
+shim = sym("verbot", "OnOff_SHIM", "M1", "Pimoroni OnOff SHIM", (82.55, 63.5))
+usb = sym(
+    "Connector",
+    "USB_B_Micro",
+    "J2",
+    "5V USB power bank",
+    (19.05, 63.5),
+    hide_value=True,  # default Value offset lands exactly on pin 2 (D-)
+)
 
 # USB bank -> SHIM. VBUS is pin 1 and shield/GND pin 5 on USB_B_Micro; confirm
 # with pin_positions("Connector", "USB_B_Micro") and adjust if the stock symbol
@@ -172,16 +215,16 @@ stub_label(shim["4"], "SHIM_BTN", "R")  # BTN  - BCM17, Pi pin 11
 stub_label(shim["5"], "SHIM_LED", "R")  # LED  - BCM27, Pi pin 13
 stub_label(shim["6"], "SHIM_POWEROFF", "R")  # POWEROFF - BCM4, Pi pin 7
 
-stub_label(pi["11"], "SHIM_BTN", "L")
-stub_label(pi["13"], "SHIM_LED", "L")
-stub_label(pi["7"], "SHIM_POWEROFF", "L")
+stub_label(pi["11"], "SHIM_BTN", pi_side("11"))
+stub_label(pi["13"], "SHIM_LED", pi_side("13"))
+stub_label(pi["7"], "SHIM_POWEROFF", pi_side("7"))
 
 # Power flags. Without one per externally-driven net, ERC errors with
 # power_pin_not_driven. GND does not need one: the stock USB_B_Micro symbol
 # types its pin 5 as a power output, so GND is already driven and adding a
 # PWR_FLAG there trips a pin_to_pin "two power outputs" conflict instead.
 for index, (net, at) in enumerate(
-    [("+5V", (44.45, 105.41)), ("+3V3", (69.85, 105.41))]
+    [("+5V", (44.45, 105.41)), ("+3V3", (82.55, 105.41))]
 ):
     flag = sym("power", "PWR_FLAG", f"#FLG0{index + 1}", "PWR_FLAG", at, hide_value=True)
     label(net, flag["1"])
@@ -209,15 +252,18 @@ MOTOR_NETS = [
     ("36", "4", "MOTOR_nFAULT"),   # BCM16       <- ULT
 ]
 for pi_pin, drv_pin, net in MOTOR_NETS:
-    stub_label(pi[pi_pin], net, "R")
+    stub_label(pi[pi_pin], net, pi_side(pi_pin))
     stub_label(drv[drv_pin], net, "L")
 
 stub_label(drv["1"], "+5V", "L")   # VCC
 stub_label(drv["2"], "GND", "L")   # GND
 
-# Bulk capacitance across the motor rail, at the carrier.
-label("+5V", c1["1"])
-label("GND", c1["2"])
+# Bulk capacitance across the motor rail, at the carrier. Both C1 pins are
+# vertical (top/bottom), so a plain label() sits at the same x as - and
+# collides with - the Value text ("470uF") printed just below the symbol
+# origin; stub left instead to clear it.
+stub_label(c1["1"], "+5V", "L")
+stub_label(c1["2"], "GND", "L")
 
 # Channel A out to the motor.
 stub_label(drv["7"], "MOTOR_A", "R")   # OUT1
@@ -261,7 +307,7 @@ SWITCHES = [
 
 for gearbox_pin, _colour, pi_pin, net, _bcm, _order in SWITCHES:
     stub_label(gearbox[gearbox_pin], net, "L")
-    stub_label(pi[pi_pin], net, "R")
+    stub_label(pi[pi_pin], net, pi_side(pi_pin))
 
 stub_label(gearbox["1"], "GND", "L")   # WHITE - common return
 stub_label(gearbox["10"], "MOTOR_A", "R")
@@ -323,14 +369,19 @@ text_note(
     "no-sdmode flag in config/config.txt.example selects - without it the\\n"
     "overlay claims BCM4, which the OnOff SHIM needs for shutdown.\\n"
     "GAIN floating = 9dB default. Speaker must be PASSIVE, 4-8 ohm.",
-    (63.5, 254.0),
+    # x=101.6 (not 63.5): the FRONT PANEL note's longest line runs to ~x=88.9
+    # on this same row, so 63.5 put the two notes' text on top of each other.
+    (101.6, 254.0),
 )
 
 # --------------------------------------------------------------------------
 # Front panel: MCP23017 expander, 8 keypad buttons, status LED
 # --------------------------------------------------------------------------
 
-mcp = sym("verbot", "MCP23017_Breakout", "M6", "MCP23017 @ 0x20", (76.2, 165.1))
+# x=91.44 (not 76.2): the button column below needs room to clear the sheet's
+# left edge, and MCP23017's own left-side labels (I2C_SDA etc) need to stay
+# clear of the buttons' rightward GND labels in turn - see BUTTON_ORDER below.
+mcp = sym("verbot", "MCP23017_Breakout", "M6", "MCP23017 @ 0x20", (91.44, 165.1))
 
 stub_label(mcp["1"], "+3V3", "L")   # VDD
 stub_label(mcp["2"], "GND", "L")    # VSS
@@ -346,8 +397,8 @@ for mcp_pin in ("6", "7", "8"):
 nc(mcp["9"])    # INTA
 nc(mcp["10"])   # INTB
 
-stub_label(pi["3"], "I2C_SDA", "L")   # BCM2
-stub_label(pi["5"], "I2C_SCL", "L")   # BCM3
+stub_label(pi["3"], "I2C_SDA", pi_side("3"))   # BCM2
+stub_label(pi["5"], "I2C_SCL", pi_side("5"))   # BCM3
 
 # GPA0-7 -> the eight original red buttons, common side to GND.
 # Order is BUTTON_ORDER in src/verbot/hardware/mcp23017.py.
@@ -365,9 +416,12 @@ for index, action in enumerate(BUTTON_ORDER):
     mcp_pin = str(11 + index)          # GPA0 is pin 11 in the block symbol
     net = f"BTN_{action}"
     stub_label(mcp[mcp_pin], net, "R")
+    # x=40.64 (not 12.7): "BTN_ROTATE_RIGHT" is ~18mm wide and grows further
+    # left off pin 1, off the sheet edge at 12.7 - the longest net names here
+    # need more clearance from the border than a small symbol usually does.
     button = sym(
         "Switch", "SW_Push", f"SW{index + 1}", action.lower(),
-        (12.7, round(139.7 + index * 10.16, 2)),
+        (40.64, round(139.7 + index * 10.16, 2)),
     )
     stub_label(button["1"], net, "L")
     stub_label(button["2"], "GND", "R")
