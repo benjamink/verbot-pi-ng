@@ -1125,8 +1125,10 @@ led = sym("Device", "LED", "D1", "red status", (152.4, 180.34))
 stub_label(mcp["19"], "LED_DRIVE", "R")   # GPB0
 label("LED_DRIVE", led_r["1"])
 label("LED_A", led_r["2"])
-label("LED_A", led["1"])
-label("GND", led["2"])
+# pin_positions("Device", "LED") -> pin "1" is K (cathode), pin "2" is A
+# (anode). Anode gets the driven net; cathode goes to GND.
+label("LED_A", led["2"])
+label("GND", led["1"])
 
 # GPB1-7 are configured as inputs by the driver and left floating.
 for index in range(1, 8):
