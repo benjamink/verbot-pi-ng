@@ -2,15 +2,20 @@
 # Append these to /boot/firmware/config.txt on the Pi Zero 2 W, then reboot.
 
 # --- Motor PWM -------------------------------------------------------------
-# Kernel-managed hardware PWM on GPIO 12 (DRV8835 M1 PWM, BCM 12 = PWM0 ALT0).
+# Kernel-managed hardware PWM on GPIO 12 (PWM0) and GPIO 13 (PWM1), wired to
+# the DRV8833's IN1 and IN2. Two channels because the DRV8833 has no
+# PHASE/ENABLE mode: direction is which input carries the PWM.
+#
 # This is deliberately NOT pigpio: kernel PWM is independent of the PCM
 # peripheral, so it coexists with the I2S DAC below. That combination was
 # impossible on the original AIY Voice Bonnet build.
-dtoverlay=pwm,pin=12,func=4
+dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4
 
 # --- Audio output ----------------------------------------------------------
 # MAX98357A I2S DAC/amp on BCM 18 (BCLK), 19 (LRCLK), 21 (DIN).
-dtoverlay=max98357a
+# no-sdmode because SD_MODE is left to the breakout's own pull-up. Without it
+# the overlay claims BCM 4, which the OnOff SHIM needs for shutdown.
+dtoverlay=max98357a,no-sdmode
 
 # Disable the on-board analog/HDMI audio so the DAC is card 0.
 dtparam=audio=off

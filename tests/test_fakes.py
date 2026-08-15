@@ -58,3 +58,15 @@ async def test_sweep_to_visits_every_position_in_drum_order():
         (Action.ROTATE_LEFT, False),
         (Action.FORWARDS, True),
     ]
+
+
+async def test_fake_motor_reports_no_fault_by_default():
+    motor = FakeMotor()
+    assert await motor.read_fault() is False
+
+
+async def test_fake_motor_reports_an_injected_fault():
+    """Lets the controller's fault handling be exercised without a real driver."""
+    motor = FakeMotor()
+    motor.fault = True
+    assert await motor.read_fault() is True

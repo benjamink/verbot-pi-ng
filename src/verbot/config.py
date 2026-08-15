@@ -25,11 +25,17 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
 
-    # Motor: kernel PWM on GPIO 12 (PWM0), direction on GPIO 5.
+    # Motor: DRV8833 IN1/IN2 on kernel PWM channels 0 (GPIO 12) and 1 (GPIO 13).
+    # The DRV8833 has no PHASE/ENABLE mode, so direction needs two PWM channels
+    # rather than one PWM plus a direction pin - see hardware/pwm_motor.py.
     pwm_chip: int = 0
-    pwm_channel: int = 0
-    pwm_period_ns: int = 4000  # 250 kHz, the DRV8835 maximum
-    motor_dir_pin: int = 5
+    pwm_channel_a: int = 0  # IN1, positive speeds
+    pwm_channel_b: int = 1  # IN2, negative speeds
+    pwm_period_ns: int = 4000  # 250 kHz, the DRV8833 maximum
+    # nSLEEP (EEP) and nFAULT (ULT) on the carrier. Set the sleep pin to None if
+    # the board's J1 jumper is bridged, which ties nSLEEP high in hardware.
+    motor_sleep_pin: int | None = 6
+    motor_fault_pin: int | None = 16
     interrogation_speed: int = 50
     action_speed: int = -100
 

@@ -12,13 +12,18 @@ Append the contents of [`../config/config.txt.example`](../config/config.txt.exa
 to `/boot/firmware/config.txt` and reboot. Then verify:
 
 ```bash
-ls /sys/class/pwm/     # expect pwmchip0
-aplay -l               # expect the MAX98357A card
-i2cdetect -y 1         # expect a device at 0x20
+ls /sys/class/pwm/          # expect pwmchip0
+cat /sys/class/pwm/pwmchip0/npwm   # expect 2 — pwm-2chan gives both channels
+aplay -l                    # expect the MAX98357A card
+i2cdetect -y 1              # expect a device at 0x20
 ```
 
 If `pwmchip0` is absent or numbered differently, set `VERBOT_PWM_CHIP`
 accordingly — kernel PWM chip numbering has shifted between OS releases.
+
+If `npwm` reads 1, the single-channel `pwm` overlay is still in place. The
+DRV8833 needs `pwm-2chan`: it has no PHASE/ENABLE mode, so both IN1 and IN2
+need a PWM channel.
 
 ## 3. System packages
 
@@ -87,6 +92,13 @@ the ground** until step 5 passes.
 | 7 | Panel buttons | `sudo ip link set wlan0 down`, press each button | robot responds with no network |
 | 8 | Watchdog | disconnect one switch, request that action | motor stops after the timeout, status shows `fault` |
 
+If the motor never turns at all, check `EEP`/nSLEEP first: the DRV8833
+tri-states its outputs until that pin is driven high, so a mis-wired sleep pin
+looks exactly like a dead motor.
+
+If the motor turns the wrong way, swap `OUT1` and `OUT2` rather than the sign
+conventions in the code — interrogation must be the positive direction.
+
 If step 3 never reverses, the switch wiring or polarity is wrong — check
 `switch_event()` in `src/verbot/hardware/lgpio_switches.py` and confirm the pins
 read low when closed.
@@ -103,6 +115,7 @@ The defaults are inherited guesses. Replace them with measurements:
 |---------|---------|------------------|
 | `VERBOT_INTERROGATION_SPEED` | 50 | Lowest speed that still turns the drum reliably. Slower gives more reliable switch detection. |
 | `VERBOT_INTERROGATION_TIMEOUT_S` | 10.0 | Time a full drum revolution takes, roughly doubled. |
-| `VERBOT_ACTION_SPEED` | -100 | Reduce if the mechanism sounds strained. |
+| `VERBOT_ACTION_SPEED` | -100 | Reduce if the mechanism sounds strained. Also cap it if the DRV8833's `VCC` is fed from 5V: the motor is a 3V part, so ±60 is roughly its rated voltage. |
+| `VERBOT_MOTOR_SLEEP_PIN` | 6 | Set to `null` if the carrier's `J1` jumper is bridged — nSLEEP is then tied high in hardware and BCM 6 stays free. |
 
 Record what you land on here once measured.

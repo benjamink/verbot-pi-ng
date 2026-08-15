@@ -11,7 +11,20 @@ def test_switch_pins_are_unique():
     settings = Settings()
     pins = list(settings.switch_pins.values())
     assert len(pins) == len(set(pins))
-    assert settings.motor_dir_pin not in pins
+
+
+def test_motor_pins_do_not_collide_with_switch_pins():
+    settings = Settings()
+    switch_pins = set(settings.switch_pins.values())
+    assert settings.motor_sleep_pin not in switch_pins
+    assert settings.motor_fault_pin not in switch_pins
+    assert settings.motor_sleep_pin != settings.motor_fault_pin
+
+
+def test_motor_pwm_channels_differ():
+    """One channel per DRV8833 input; sharing one would fix the direction."""
+    settings = Settings()
+    assert settings.pwm_channel_a != settings.pwm_channel_b
 
 
 def test_speeds_have_opposing_signs():

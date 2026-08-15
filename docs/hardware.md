@@ -65,7 +65,7 @@ board:
 ## Power supply
 
 - **3V DC** (orange +ve, black ground) from 2× 'C' cells drove the motor. The
-  original board reversed its polarity; the DRV8835 does that job now.
+  original board reversed its polarity; the DRV8833 does that job now.
 - **6V DC** (red +ve, black ground) from 4× 'AA' cells fed the original control
   board. That board and supply are removed; a 5V USB power bank feeds the Pi.
 - Both rails were switched by the board behind the front keypad panel, which
@@ -94,13 +94,15 @@ interrogation switches, inputs with pull-ups, active low.
 | 2   | 3        | I2C1    | SDA — MCP23017 |
 | 3   | 5        | I2C1    | SCL — MCP23017 |
 | 4   | 7        | OnOff SHIM | Shutdown |
-| 5   | 29       | DRV8835 | Motor M1 direction (output) |
+| 6   | 31       | DRV8833 | nSLEEP (`EEP`) — high wakes the driver (output) |
 | 7   | 26       | **Verbot** | SW Talk |
 | 8   | 24       | **Verbot** | SW Pick up |
 | 9   | 21       | **Verbot** | SW Forwards |
 | 10  | 19       | **Verbot** | SW Rotate left |
 | 11  | 23       | **Verbot** | SW Put down |
-| 12  | 32       | DRV8835 | Motor M1 PWM — kernel PWM0 (`dtoverlay=pwm,pin=12,func=4`) |
+| 12  | 32       | DRV8833 | Motor `IN1` — kernel PWM0 |
+| 13  | 33       | DRV8833 | Motor `IN2` — kernel PWM1 |
+| 16  | 36       | DRV8833 | nFAULT (`ULT`) — active low, input with pull-up |
 | 17  | 11       | OnOff SHIM | Power button |
 | 18  | 12       | I2S DAC | BCLK |
 | 19  | 35       | I2S DAC | LRCLK |
@@ -110,12 +112,39 @@ interrogation switches, inputs with pull-ups, active low.
 | 26  | 37       | **Verbot** | SW Rotate right |
 | 27  | 13       | OnOff SHIM | LED |
 
-**Free:** BCM 6, 13, 14, 15, 16, 20, 23, 24.
+Both PWM channels come from one overlay:
+`dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4`.
+
+**Free:** BCM 5, 14, 15, 20, 23, 24.
+
+## DRV8833 carrier wiring
+
+The common 12-pin breakout (`IN1`–`IN4`, `OUT1`–`OUT4`, `VCC`, `GND`, `EEP`,
+`ULT`). Only channel A is used; `IN3`/`IN4`/`OUT3`/`OUT4` are left unconnected.
+
+| Carrier pin | Goes to | Notes |
+|-------------|---------|-------|
+| `VCC` | Motor supply | **Not a logic rail.** The chip runs its own 3.3V regulator off this, so whatever you apply is what the motor sees. |
+| `GND` | Pi GND | Common ground with the Pi is required for the logic to work. |
+| `IN1` | BCM 12 | PWM0 |
+| `IN2` | BCM 13 | PWM1 |
+| `OUT1`/`OUT2` | Verbot motor | Polarity decides which sign is interrogation; swap if reversed. |
+| `EEP` | BCM 6 | nSLEEP. The `J1` solder jumper ties this to `VCC` — check it with a meter. If it is bridged, set `VERBOT_MOTOR_SLEEP_PIN` to `null` and leave BCM 6 free. |
+| `ULT` | BCM 16 | nFAULT, open-drain. Relies on the Pi's internal pull-up. |
+
+Feeding `VCC` from 5V means the 3V motor sees 5V at full duty — cap
+`VERBOT_ACTION_SPEED` accordingly rather than running it at ±100. Do **not**
+feed `VCC` from the Pi's 3V3 pin to get a nominal 3V: that rail comes off the
+PMIC and cannot supply a stalled motor.
+
+There is no MODE pin. Unlike the DRV8835 this part has no PHASE/ENABLE mode,
+which is why direction costs a second PWM channel rather than one GPIO.
 
 ### Notable changes from the original project
 
-- **Motor moved from the DRV8835 M2 channel to M1** (PWM 13→12, DIR 6→5). M1's
-  PWM pin is PWM0, which the single-channel `pwm` overlay drives directly.
+- **DRV8833 instead of a DRV8835**, driven as IN/IN on two kernel PWM channels
+  (BCM 12 and 13) rather than one PWM plus a direction pin. Its `nSLEEP` and
+  `nFAULT` lines are wired up; nothing reads the fault line yet.
 - **Motor PWM is kernel-managed**, not pigpio. pigpio needs the PCM peripheral
   for DMA timing to leave hardware PWM available; the I2S DAC needs PCM too.
   Kernel PWM sidesteps that conflict entirely — the original project had to

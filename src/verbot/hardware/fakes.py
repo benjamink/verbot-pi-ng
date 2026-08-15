@@ -22,6 +22,7 @@ class FakeMotor:
         self.speed_history: list[int] = []
         self.opened = False
         self.closed = False
+        self.fault = False
 
     async def open(self) -> None:
         self.opened = True
@@ -31,6 +32,9 @@ class FakeMotor:
             raise ValueError(f"speed {percent} out of range [-100, 100]")
         self.speed = percent
         self.speed_history.append(percent)
+
+    async def read_fault(self) -> bool:
+        return self.fault
 
     async def close(self) -> None:
         self.closed = True

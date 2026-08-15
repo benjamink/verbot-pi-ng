@@ -34,8 +34,8 @@ for the task breakdown and deferred phase 2 work.
 
 - Tomy Verbot with working motor and gearbox
 - Raspberry Pi Zero 2 W (64-bit Raspberry Pi OS, Trixie)
-- [Pololu DRV8835 dual motor driver](https://www.pololu.com/product/2753)
-- MAX98357A I2S DAC/amplifier + small speaker
+- DRV8833 dual motor driver carrier
+- MAX98357A I2S DAC/amplifier + small **passive** speaker (4–8Ω)
 - MCP23017 I2C GPIO expander (front-panel buttons + status LED)
 - [Pimoroni OnOff SHIM](https://shop.pimoroni.com/products/onoff-shim)
 - 5V USB power bank
