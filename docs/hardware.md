@@ -13,6 +13,11 @@
 > The GPIO table below and `src/verbot/config.py` remain the pin-map source of
 > truth; the schematic reproduces them.
 
+> 🎨 **Wiring map:** [`hardware/wiring-map.html`](../hardware/wiring-map.html)
+> — the same wiring drawn in colour, with the interrogation ribbon rendered in
+> its actual conductor colours. Easier to work from at the bench than the
+> schematic; open it in a browser.
+
 ## Electro-mechanical operation
 
 Verbot is driven by a **single bi-directional 3V DC motor** and a set of

@@ -1,0 +1,712 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verbot Wiring Map</title>
+
+<style>
+  /* ---- Tokens: light is the bare :root ------------------------------- */
+  :root {
+    --ground:      #E7EAEF;
+    --surface:     #FAFBFC;
+    --surface-2:   #F0F2F6;
+    --ink:         #171A20;
+    --ink-soft:    #59616F;
+    --ink-faint:   #858D9B;
+    --rule:        #C6CCD7;
+    --rule-soft:   #DCE0E8;
+    --accent:      #1F6B78;
+    --accent-soft: #DCEAEC;
+    --warn:        #9A4A16;
+    --warn-soft:   #F7E9DC;
+
+    /* Ribbon-cable conductors. These are data, not decoration. */
+    --w-white:  #A8B1C0;
+    --w-purple: #7444C8;
+    --w-red:    #C93129;
+    --w-yellow: #A97A05;
+    --w-grey:   #798393;
+    --w-blue:   #2266BE;
+    --w-brown:  #855430;
+    --w-orange: #C9681A;
+    --w-green:  #1E7A45;
+
+    --shadow: 0 1px 2px rgba(20, 26, 38, .06), 0 8px 24px -12px rgba(20, 26, 38, .18);
+
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #131519;
+      --surface:     #1B1E24;
+      --surface-2:   #22262E;
+      --ink:         #E3E7ED;
+      --ink-soft:    #99A2B1;
+      --ink-faint:   #6E7787;
+      --rule:        #333945;
+      --rule-soft:   #272C35;
+      --accent:      #5FB3C0;
+      --accent-soft: #173236;
+      --warn:        #E0A06A;
+      --warn-soft:   #2E2118;
+
+      --w-white:  #D5DBE6;
+      --w-purple: #A98BF5;
+      --w-red:    #EF6259;
+      --w-yellow: #DEB144;
+      --w-grey:   #9AA4B3;
+      --w-blue:   #5CA0EE;
+      --w-brown:  #C08B5C;
+      --w-orange: #EE9139;
+      --w-green:  #4FC07D;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .6);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:      #131519;
+    --surface:     #1B1E24;
+    --surface-2:   #22262E;
+    --ink:         #E3E7ED;
+    --ink-soft:    #99A2B1;
+    --ink-faint:   #6E7787;
+    --rule:        #333945;
+    --rule-soft:   #272C35;
+    --accent:      #5FB3C0;
+    --accent-soft: #173236;
+    --warn:        #E0A06A;
+    --warn-soft:   #2E2118;
+
+    --w-white:  #D5DBE6;
+    --w-purple: #A98BF5;
+    --w-red:    #EF6259;
+    --w-yellow: #DEB144;
+    --w-grey:   #9AA4B3;
+    --w-blue:   #5CA0EE;
+    --w-brown:  #C08B5C;
+    --w-orange: #EE9139;
+    --w-green:  #4FC07D;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .6);
+  }
+
+  /* ---- Base ---------------------------------------------------------- */
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0 20px 96px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  /* ---- Masthead ------------------------------------------------------ */
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 64px 0 36px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 44px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(30px, 6vw, 50px);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    line-height: 1.04;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .standfirst {
+    font-size: 17px;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 4px;
+  }
+  .meta b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---- Sections ------------------------------------------------------ */
+  section { margin-bottom: 60px; }
+  h2 {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 0 0 6px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+  }
+  h2 span { color: var(--ink-faint); font-weight: 400; letter-spacing: .04em; text-transform: none; }
+  .lede { color: var(--ink-soft); max-width: 68ch; margin: 16px 0 24px; }
+
+  h3 {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 12px;
+  }
+
+  /* ---- Figures ------------------------------------------------------- */
+  figure {
+    margin: 0 0 28px;
+    background: var(--surface);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .plate { overflow-x: auto; padding: 26px 22px 10px; }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 640px; margin: 0 auto; }
+  figcaption {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--rule-soft);
+    background: var(--surface-2);
+  }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* ---- Tables -------------------------------------------------------- */
+  .scroll { overflow-x: auto; border: 1px solid var(--rule-soft); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14px; }
+  caption { text-align: left; padding: 14px 16px 0; font-size: 13px; color: var(--ink-faint); }
+  th, td { padding: 9px 16px; text-align: left; border-bottom: 1px solid var(--rule-soft); }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.pin, td.bcm { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.sig { font-family: var(--mono); font-size: 13px; }
+  .nc { color: var(--ink-faint); font-style: italic; }
+
+  /* Conductor colours, applied as classes rather than var() inside SVG
+     presentation attributes, which Safari has not always resolved. */
+  .w-white  { stroke: var(--w-white); }
+  .w-purple { stroke: var(--w-purple); }
+  .w-red    { stroke: var(--w-red); }
+  .w-yellow { stroke: var(--w-yellow); }
+  .w-grey   { stroke: var(--w-grey); }
+  .w-blue   { stroke: var(--w-blue); }
+  .w-brown  { stroke: var(--w-brown); }
+  .w-orange { stroke: var(--w-orange); }
+  .w-green  { stroke: var(--w-green); }
+
+  .t-white  { fill: var(--w-white); }
+  .t-purple { fill: var(--w-purple); }
+  .t-red    { fill: var(--w-red); }
+  .t-yellow { fill: var(--w-yellow); }
+  .t-grey   { fill: var(--w-grey); }
+  .t-blue   { fill: var(--w-blue); }
+  .t-brown  { fill: var(--w-brown); }
+  .t-orange { fill: var(--w-orange); }
+  .t-green  { fill: var(--w-green); }
+
+  .swatch {
+    display: inline-block;
+    width: 11px; height: 11px;
+    border-radius: 2px;
+    margin-right: 8px;
+    vertical-align: -1px;
+    border: 1px solid rgba(128, 128, 128, .35);
+  }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+
+  /* ---- Callouts ------------------------------------------------------ */
+  .note {
+    border-left: 3px solid var(--warn);
+    background: var(--warn-soft);
+    padding: 16px 20px;
+    border-radius: 0 3px 3px 0;
+    margin: 24px 0;
+  }
+  .note h4 {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--warn);
+    margin: 0 0 8px;
+  }
+  .note p { margin: 0 0 10px; font-size: 14.5px; color: var(--ink); }
+  .note p:last-child { margin-bottom: 0; }
+
+  .keyline {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 16px 20px;
+    border-radius: 0 3px 3px 0;
+    margin: 24px 0;
+  }
+  .keyline p { margin: 0; font-size: 14.5px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--surface-2);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+    padding: 1px 5px;
+  }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    font-size: 13px;
+    color: var(--ink-faint);
+  }
+  footer a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Tomy Verbot × Raspberry Pi Zero 2 W</p>
+    <h1>Verbot Wiring Map</h1>
+    <p class="standfirst">Every connection between the 1984 gearbox, the four breakout boards, and the Pi's 40-pin header — with the interrogation ribbon drawn in the colours you'll actually be holding.</p>
+    <div class="meta">
+      <span><b>Header</b> 40-pin, Pi Zero 2 W</span>
+      <span><b>Free after build</b> BCM 5, 14, 15, 20, 23, 24</span>
+      <span><b>Source of truth</b> src/verbot/config.py</span>
+    </div>
+  </header>
+
+  <!-- ============================== SYSTEM ============================= -->
+  <section>
+    <h2>System map <span>what talks to what</span></h2>
+    <p class="lede">Five boards hang off the Pi. Only the gearbox is original 1984 hardware — everything else replaces the controller board that was removed.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 900 560" role="img" aria-label="Block diagram: a USB power bank feeds the OnOff SHIM, which powers the Pi Zero 2 W and the DRV8833 motor driver. The Pi connects to an MCP23017 expander over I2C, a MAX98357A amplifier over I2S, the DRV8833 over two PWM channels, and the Verbot gearbox over eight switch lines. The DRV8833 drives the motor inside the gearbox.">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <g font-family="ui-monospace, Menlo, Consolas, monospace" fill="currentColor">
+
+            <!-- Pi, centre -->
+            <rect x="352" y="196" width="196" height="168" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+            <text x="450" y="266" text-anchor="middle" font-size="15" font-weight="600">Raspberry Pi</text>
+            <text x="450" y="288" text-anchor="middle" font-size="15" font-weight="600">Zero 2 W</text>
+            <text x="450" y="312" text-anchor="middle" font-size="11" opacity=".6">40-pin header</text>
+            <text x="450" y="226" text-anchor="middle" font-size="10" letter-spacing="1.6" opacity=".55">J1</text>
+
+            <!-- Left column -->
+            <rect x="40" y="40" width="180" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".8"/>
+            <text x="130" y="63" text-anchor="middle" font-size="12.5">5V USB</text>
+            <text x="130" y="80" text-anchor="middle" font-size="12.5">power bank</text>
+
+            <rect x="40" y="150" width="180" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="130" y="173" text-anchor="middle" font-size="12.5">OnOff SHIM</text>
+            <text x="130" y="190" text-anchor="middle" font-size="10.5" opacity=".6">soft power switch</text>
+
+            <rect x="40" y="300" width="180" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="130" y="323" text-anchor="middle" font-size="12.5">MCP23017</text>
+            <text x="130" y="340" text-anchor="middle" font-size="10.5" opacity=".6">8 buttons + LED</text>
+
+            <rect x="40" y="440" width="180" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="130" y="463" text-anchor="middle" font-size="12.5">MAX98357A</text>
+            <text x="130" y="480" text-anchor="middle" font-size="10.5" opacity=".6">DAC + speaker</text>
+
+            <!-- Right column -->
+            <rect x="680" y="150" width="180" height="52" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="770" y="173" text-anchor="middle" font-size="12.5">DRV8833</text>
+            <text x="770" y="190" text-anchor="middle" font-size="10.5" opacity=".6">H-bridge, ch. A</text>
+
+            <rect x="680" y="330" width="180" height="126" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+            <text x="770" y="360" text-anchor="middle" font-size="12.5" font-weight="600">Verbot gearbox</text>
+            <text x="770" y="378" text-anchor="middle" font-size="10.5" opacity=".6">original 1984 part</text>
+            <line x1="700" y1="392" x2="840" y2="392" stroke="currentColor" stroke-width="1" opacity=".3"/>
+            <text x="770" y="412" text-anchor="middle" font-size="11">3V motor</text>
+            <text x="770" y="432" text-anchor="middle" font-size="11">8 cam switches</text>
+
+            <!-- Edges: power -->
+            <line x1="130" y1="92" x2="130" y2="150" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+            <path d="M 220 168 L 300 168 L 300 232 L 352 232" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+            <text x="306" y="162" font-size="11">+5V</text>
+            <path d="M 220 186 L 280 186 L 280 252 L 352 252" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".55" marker-end="url(#ah)"/>
+            <text x="286" y="278" font-size="10.5" opacity=".7">BCM 4/17/27</text>
+
+            <!-- SHIM to DRV8833 (motor rail) -->
+            <path d="M 220 158 L 250 158 L 250 108 L 770 108 L 770 150" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+            <text x="500" y="100" text-anchor="middle" font-size="11">+5V motor rail — see power tree</text>
+
+            <!-- MCP23017 I2C -->
+            <path d="M 220 326 L 352 326" fill="none" stroke="currentColor" stroke-width="1.4" marker-start="url(#ah)" marker-end="url(#ah)"/>
+            <text x="286" y="318" text-anchor="middle" font-size="11">I²C</text>
+            <text x="286" y="344" text-anchor="middle" font-size="10.5" opacity=".7">BCM 2/3</text>
+
+            <!-- MAX98357A I2S -->
+            <path d="M 352 348 L 300 348 L 300 466 L 220 466" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+            <text x="240" y="458" font-size="11">I²S</text>
+            <text x="228" y="492" font-size="10.5" opacity=".7">BCM 18/19/21</text>
+
+            <!-- Pi to DRV8833 -->
+            <path d="M 548 218 L 620 218 L 620 168 L 680 168" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#ah)"/>
+            <text x="586" y="210" text-anchor="middle" font-size="11">PWM ×2</text>
+            <text x="600" y="240" text-anchor="middle" font-size="10.5" opacity=".7">BCM 12/13 · 6 · 16</text>
+
+            <!-- DRV8833 to motor -->
+            <path d="M 770 202 L 770 330" fill="none" stroke="currentColor" stroke-width="1.8" marker-end="url(#ah)"/>
+            <text x="782" y="270" font-size="11">OUT1/OUT2</text>
+
+            <!-- Gearbox switches to Pi -->
+            <path d="M 680 400 L 600 400 L 600 340 L 548 340" fill="none" stroke="currentColor" stroke-width="1.8" marker-end="url(#ah)"/>
+            <text x="614" y="392" text-anchor="middle" font-size="11">8 switches</text>
+            <text x="612" y="422" text-anchor="middle" font-size="10.5" opacity=".7">9-core ribbon</text>
+
+            <!-- Speaker + keypad leaf notes -->
+            <text x="130" y="512" text-anchor="middle" font-size="10.5" opacity=".55">→ 4–8 Ω passive speaker</text>
+            <text x="130" y="372" text-anchor="middle" font-size="10.5" opacity=".55">→ front panel, 0x20</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>Signal directions matter.</b> The gearbox only ever reports position back to the Pi; it takes no commands. Everything the robot actually <em>does</em> happens through the DRV8833, which reverses one motor to switch the whole mechanism between hunting for a gear and running it.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ============================== RIBBON ============================= -->
+  <section>
+    <h2>The interrogation ribbon <span>9-core, gearbox → Pi</span></h2>
+    <p class="lede">A drum inside the gearbox turns eight cams past eight normally-open switches. Each closes in a fixed sequence, telling the software which gear set is currently selected. All eight return through the single white ground.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 860 500" role="img" aria-label="The nine-core ribbon cable. White is the common ground return. Purple is stop, BCM 22, header pin 15. Red is rotate right, BCM 26, pin 37. Yellow is rotate left, BCM 10, pin 19. Grey is forwards, BCM 9, pin 21. Blue is reverse, BCM 25, pin 22. Brown is put down, BCM 11, pin 23, with a limit switch in series. Orange is pick up, BCM 8, pin 24, with a limit switch in series. Green is talk, BCM 7, pin 26.">
+          <g font-family="ui-monospace, Menlo, Consolas, monospace">
+
+            <!-- column headers -->
+            <g fill="currentColor" opacity=".5" font-size="10" letter-spacing="1.3">
+              <text x="322" y="34">WIRE</text>
+              <text x="432" y="34">ACTION</text>
+              <text x="626" y="34">BCM</text>
+              <text x="712" y="34">HEADER PIN</text>
+              <text x="176" y="34">ORDER</text>
+            </g>
+            <line x1="30" y1="44" x2="830" y2="44" stroke="currentColor" stroke-width="1" opacity=".25"/>
+
+            <!-- gearbox spine -->
+            <rect x="30" y="58" width="112" height="404" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+            <text x="86" y="248" text-anchor="middle" font-size="12" font-weight="600" fill="currentColor">GEARBOX</text>
+            <text x="86" y="268" text-anchor="middle" font-size="10" fill="currentColor" opacity=".6">switch bank</text>
+
+            <!-- rows: white ground first -->
+            <g stroke-linecap="round">
+              <line x1="142" y1="78"  x2="300" y2="78"  class="w-white"  stroke-width="7"/>
+              <line x1="142" y1="126" x2="300" y2="126" class="w-purple" stroke-width="7"/>
+              <line x1="142" y1="174" x2="300" y2="174" class="w-red"    stroke-width="7"/>
+              <line x1="142" y1="222" x2="300" y2="222" class="w-yellow" stroke-width="7"/>
+              <line x1="142" y1="270" x2="300" y2="270" class="w-grey"   stroke-width="7"/>
+              <line x1="142" y1="318" x2="300" y2="318" class="w-blue"   stroke-width="7"/>
+              <!-- brown and orange carry an inline limit switch: drawn as a break -->
+              <line x1="142" y1="366" x2="212" y2="366" class="w-brown"  stroke-width="7"/>
+              <line x1="248" y1="366" x2="300" y2="366" class="w-brown"  stroke-width="7"/>
+              <line x1="142" y1="414" x2="212" y2="414" class="w-orange" stroke-width="7"/>
+              <line x1="248" y1="414" x2="300" y2="414" class="w-orange" stroke-width="7"/>
+              <line x1="142" y1="462" x2="300" y2="462" class="w-green"  stroke-width="7"/>
+            </g>
+
+            <!-- limit-switch glyphs on brown and orange -->
+            <g fill="none" stroke="currentColor" stroke-width="1.6">
+              <circle cx="214" cy="366" r="3.4"/><circle cx="246" cy="366" r="3.4"/>
+              <line x1="217" y1="364" x2="245" y2="354"/>
+              <circle cx="214" cy="414" r="3.4"/><circle cx="246" cy="414" r="3.4"/>
+              <line x1="217" y1="412" x2="245" y2="402"/>
+            </g>
+
+            <!-- order numbers -->
+            <g fill="currentColor" font-size="11.5" opacity=".55" text-anchor="middle">
+              <text x="190" y="82">—</text>
+              <text x="190" y="130">1</text><text x="190" y="178">2</text>
+              <text x="190" y="226">3</text><text x="190" y="274">4</text>
+              <text x="190" y="322">5</text><text x="190" y="370">6</text>
+              <text x="190" y="418">7</text><text x="190" y="466">8</text>
+            </g>
+
+            <!-- wire names -->
+            <g font-size="12.5" font-weight="600">
+              <text x="316" y="82"  class="t-white">WHITE</text>
+              <text x="316" y="130" class="t-purple">PURPLE</text>
+              <text x="316" y="178" class="t-red">RED</text>
+              <text x="316" y="226" class="t-yellow">YELLOW</text>
+              <text x="316" y="274" class="t-grey">GREY</text>
+              <text x="316" y="322" class="t-blue">BLUE</text>
+              <text x="316" y="370" class="t-brown">BROWN</text>
+              <text x="316" y="418" class="t-orange">ORANGE</text>
+              <text x="316" y="466" class="t-green">GREEN</text>
+            </g>
+
+            <!-- actions -->
+            <g fill="currentColor" font-size="12.5">
+              <text x="432" y="82" opacity=".6">common ground return</text>
+              <text x="432" y="130">Stop</text>
+              <text x="432" y="178">Rotate right</text>
+              <text x="432" y="226">Rotate left</text>
+              <text x="432" y="274">Forwards</text>
+              <text x="432" y="322">Reverse</text>
+              <text x="432" y="370">Put down <tspan opacity=".55" font-size="11">· limit sw.</tspan></text>
+              <text x="432" y="418">Pick up <tspan opacity=".55" font-size="11">· limit sw.</tspan></text>
+              <text x="432" y="466">Talk</text>
+            </g>
+
+            <!-- bcm -->
+            <g fill="currentColor" font-size="12.5">
+              <text x="626" y="82" opacity=".45">GND</text>
+              <text x="626" y="130">22</text><text x="626" y="178">26</text>
+              <text x="626" y="226">10</text><text x="626" y="274">9</text>
+              <text x="626" y="322">25</text><text x="626" y="370">11</text>
+              <text x="626" y="418">8</text><text x="626" y="466">7</text>
+            </g>
+
+            <!-- header pins -->
+            <g fill="currentColor" font-size="12.5">
+              <text x="712" y="82" opacity=".45">6 · 9 · 14 …</text>
+              <text x="712" y="130">15</text><text x="712" y="178">37</text>
+              <text x="712" y="226">19</text><text x="712" y="274">21</text>
+              <text x="712" y="322">22</text><text x="712" y="370">23</text>
+              <text x="712" y="418">24</text><text x="712" y="466">26</text>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>The two switches drawn with a break are the important ones.</b> Brown and orange pass through mechanical limit switches inside the gearbox. When an arm reaches the end of its travel that circuit <em>opens</em> — the controller sees the switch release mid-action and stops the motor. Without that signal the mechanism strains against its own stop.</figcaption>
+    </figure>
+
+    <div class="keyline">
+      <p><strong>How an action actually runs.</strong> Drive the motor anti-clockwise until the switch for the action you want closes, then immediately reverse it. That engages a clutch: the drum stops, and a shaft inside it starts turning the selected gear set. Direction alone chooses between <em>hunting</em> and <em>doing</em>.</p>
+    </div>
+  </section>
+
+  <!-- ============================== POWER ============================= -->
+  <section>
+    <h2>Power tree <span>one rail, one known compromise</span></h2>
+    <p class="lede">A single 5V bank feeds everything through the OnOff SHIM's load switch. That includes the motor, which is the part worth thinking about.</p>
+
+    <figure>
+      <div class="plate">
+        <svg viewBox="0 0 860 320" role="img" aria-label="Power tree: the 5V USB bank feeds the OnOff SHIM. The SHIM's switched 5V output splits to the Pi's 5V rail on header pins 2 and 4, and to the DRV8833's VCC, which is the motor supply with a 470 microfarad bulk capacitor. The Pi's own 3.3V regulator supplies the MCP23017. All motor current passes through the SHIM load switch.">
+          <defs>
+            <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 1 L 9 5 L 0 9 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <g font-family="ui-monospace, Menlo, Consolas, monospace" fill="currentColor">
+
+            <rect x="24" y="120" width="150" height="56" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <text x="99" y="144" text-anchor="middle" font-size="12.5">5V USB bank</text>
+            <text x="99" y="162" text-anchor="middle" font-size="10.5" opacity=".6">micro-USB in</text>
+
+            <rect x="238" y="120" width="150" height="56" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+            <text x="313" y="144" text-anchor="middle" font-size="12.5">OnOff SHIM</text>
+            <text x="313" y="162" text-anchor="middle" font-size="10.5" opacity=".6">load switch ≈ 2 A</text>
+
+            <rect x="500" y="34" width="170" height="56" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <text x="585" y="58" text-anchor="middle" font-size="12.5">Pi 5V rail</text>
+            <text x="585" y="76" text-anchor="middle" font-size="10.5" opacity=".6">header pins 2 · 4</text>
+
+            <rect x="500" y="206" width="170" height="56" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <text x="585" y="230" text-anchor="middle" font-size="12.5">DRV8833 VCC</text>
+            <text x="585" y="248" text-anchor="middle" font-size="10.5" opacity=".6">motor supply</text>
+
+            <rect x="716" y="120" width="120" height="56" rx="3" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".85"/>
+            <text x="776" y="144" text-anchor="middle" font-size="12" >MCP23017</text>
+            <text x="776" y="162" text-anchor="middle" font-size="10.5" opacity=".6">on 3V3</text>
+
+            <line x1="174" y1="148" x2="238" y2="148" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah2)"/>
+            <path d="M 388 140 L 444 140 L 444 62 L 500 62" fill="none" stroke="currentColor" stroke-width="1.6" marker-end="url(#ah2)"/>
+            <path d="M 388 158 L 444 158 L 444 234 L 500 234" fill="none" stroke="currentColor" stroke-width="2.4" marker-end="url(#ah2)"/>
+            <text x="452" y="196" font-size="11">motor current</text>
+
+            <path d="M 670 62 L 700 62 L 700 120" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".7" marker-end="url(#ah2)"/>
+            <text x="676" y="106" font-size="10.5" opacity=".7">3V3</text>
+
+            <!-- bulk cap -->
+            <line x1="585" y1="262" x2="585" y2="286" stroke="currentColor" stroke-width="1.4"/>
+            <line x1="568" y1="286" x2="602" y2="286" stroke="currentColor" stroke-width="2.4"/>
+            <line x1="572" y1="294" x2="598" y2="294" stroke="currentColor" stroke-width="2.4"/>
+            <text x="612" y="292" font-size="10.5" opacity=".75">C1 470 µF</text>
+
+            <text x="313" y="200" text-anchor="middle" font-size="10.5" opacity=".65">everything downstream</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption><b>The thick line is the compromise.</b> Motor current runs through the SHIM's load switch, rated around 2 A. A 3 V motor stalled on a 5 V rail can transiently exceed that, and the failure looks like a software hang — the Pi simply drops mid-action.</figcaption>
+    </figure>
+
+    <div class="note">
+      <h4>Two things that will bite you</h4>
+      <p><strong>Cap the action speed.</strong> The motor is a 3 V part sitting on a 5 V rail. Keep <code>VERBOT_ACTION_SPEED</code> near ±60 rather than ±100, or you are overdriving it every time it moves.</p>
+      <p><strong>Never feed <code>VCC</code> from the Pi's 3V3 pin</strong> to get a nominal 3 V. That rail comes off the PMIC and cannot supply a stalled motor. <code>VCC</code> is the motor supply, not a logic rail — whatever you apply is what the motor sees.</p>
+    </div>
+  </section>
+
+  <!-- ============================== TABLES ============================= -->
+  <section>
+    <h2>Board by board <span>every remaining connection</span></h2>
+
+    <div class="grid2">
+      <div>
+        <h3>DRV8833 carrier</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Carrier</th><th>Goes to</th><th>BCM</th></tr></thead>
+            <tbody>
+              <tr><td class="sig">VCC</td><td>+5V motor rail</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">GND</td><td>Common ground</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">IN1</td><td class="pin">pin 32</td><td class="bcm">12 · PWM0</td></tr>
+              <tr><td class="sig">IN2</td><td class="pin">pin 33</td><td class="bcm">13 · PWM1</td></tr>
+              <tr><td class="sig">EEP</td><td class="pin">pin 31</td><td class="bcm">6</td></tr>
+              <tr><td class="sig">ULT</td><td class="pin">pin 36</td><td class="bcm">16</td></tr>
+              <tr><td class="sig">OUT1 / OUT2</td><td>Verbot motor</td><td class="bcm">—</td></tr>
+              <tr><td class="sig nc">IN3 · IN4 · OUT3 · OUT4</td><td class="nc">unused, channel B</td><td class="bcm">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3>MAX98357A</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Board</th><th>Goes to</th><th>BCM</th></tr></thead>
+            <tbody>
+              <tr><td class="sig">VIN</td><td>+5V</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">GND</td><td>Common ground</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">BCLK</td><td class="pin">pin 12</td><td class="bcm">18</td></tr>
+              <tr><td class="sig">LRC</td><td class="pin">pin 35</td><td class="bcm">19</td></tr>
+              <tr><td class="sig">DIN</td><td class="pin">pin 40</td><td class="bcm">21</td></tr>
+              <tr><td class="sig">+ / −</td><td>4–8 Ω passive speaker</td><td class="bcm">—</td></tr>
+              <tr><td class="sig nc">SD</td><td class="nc">leave floating</td><td class="bcm">—</td></tr>
+              <tr><td class="sig nc">GAIN</td><td class="nc">floating = 9 dB</td><td class="bcm">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3>MCP23017 · address 0x20</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Board</th><th>Goes to</th><th>BCM</th></tr></thead>
+            <tbody>
+              <tr><td class="sig">VDD</td><td class="pin">pin 1 · +3V3</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">VSS</td><td>Common ground</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">SDA</td><td class="pin">pin 3</td><td class="bcm">2</td></tr>
+              <tr><td class="sig">SCL</td><td class="pin">pin 5</td><td class="bcm">3</td></tr>
+              <tr><td class="sig">RESET</td><td>+3V3, held high</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">A0 · A1 · A2</td><td>GND → 0x20</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">GPA0–GPA7</td><td>8 panel buttons → GND</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">GPB0</td><td>330 Ω → status LED → GND</td><td class="bcm">—</td></tr>
+              <tr><td class="sig nc">INTA · INTB</td><td class="nc">unused, polled at 50 Hz</td><td class="bcm">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <h3>OnOff SHIM</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Board</th><th>Goes to</th><th>BCM</th></tr></thead>
+            <tbody>
+              <tr><td class="sig">USB 5V in</td><td>Power bank</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">5V out</td><td class="pin">pins 2 · 4</td><td class="bcm">—</td></tr>
+              <tr><td class="sig">BTN</td><td class="pin">pin 11</td><td class="bcm">17</td></tr>
+              <tr><td class="sig">LED</td><td class="pin">pin 13</td><td class="bcm">27</td></tr>
+              <tr><td class="sig">POWEROFF</td><td class="pin">pin 7</td><td class="bcm">4</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3 style="margin-top:24px">Ground &amp; rails</h3>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>Rail</th><th>Header pins</th></tr></thead>
+            <tbody>
+              <tr><td class="sig">+5V</td><td class="pin">2 · 4</td></tr>
+              <tr><td class="sig">+3V3</td><td class="pin">1 · 17</td></tr>
+              <tr><td class="sig">GND</td><td class="pin">6 · 9 · 14 · 20 · 25 · 30 · 34 · 39</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== PANEL ============================= -->
+  <section>
+    <h2>Front panel <span>the part that isn't confirmed</span></h2>
+    <p class="lede">The eight original red buttons map one-to-one onto the eight gearbox actions, exactly as the toy did in 1984. They hang off the expander's port A as active-low inputs with pull-ups enabled.</p>
+
+    <div class="scroll">
+      <table>
+        <caption>Left-to-right panel order, as assumed by <code>BUTTON_ORDER</code></caption>
+        <thead><tr><th>Expander pin</th><th>Button</th><th>Expander pin</th><th>Button</th></tr></thead>
+        <tbody>
+          <tr><td class="sig">GPA0</td><td>Stop</td><td class="sig">GPA4</td><td>Rotate right</td></tr>
+          <tr><td class="sig">GPA1</td><td>Forwards</td><td class="sig">GPA5</td><td>Pick up</td></tr>
+          <tr><td class="sig">GPA2</td><td>Reverse</td><td class="sig">GPA6</td><td>Put down</td></tr>
+          <tr><td class="sig">GPA3</td><td>Rotate left</td><td class="sig">GPA7</td><td>Talk</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <h4>Verify before you wire this</h4>
+      <p>This assumes the eight buttons are <strong>independent switches to a common rail</strong>. That has never been confirmed on the real panel — they may well be a matrix. Check with a meter first.</p>
+      <p>The original PCB also carried the power switching for both battery rails, so the cleanest approach is to bypass that board entirely and solder to the switch contacts directly.</p>
+      <p>The button order above is a <strong>guess</strong>. If a button triggers the wrong action at bring-up, reorder <code>BUTTON_ORDER</code> rather than rewiring.</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>Pin assignments come from <code>src/verbot/config.py</code> and <code>src/verbot/hardware/mcp23017.py</code>; the mechanical analysis and ribbon colour map were reverse-engineered by Neil Davis for <em>neildavis/verbot-pi</em>, partly from Tomy's patent US4717364A. The formal schematic lives at <code>hardware/verbot-schematic.pdf</code> — this page is its readable companion, not a replacement.</p>
+  </footer>
+
+</div>
