@@ -241,6 +241,54 @@ text_note(
 )
 
 # --------------------------------------------------------------------------
+# Interrogation switch bank - 9-core ribbon from the gearbox
+# --------------------------------------------------------------------------
+
+gearbox = sym("verbot", "Verbot_Gearbox", "M4", "Verbot gearbox harness", (330.2, 190.5))
+
+# (gearbox pin, ribbon colour, Pi physical pin, net, BCM, interrogation order)
+# Pin map is DEFAULT_SWITCH_PINS in src/verbot/config.py.
+SWITCHES = [
+    ("2", "PURPLE", "15", "SW_STOP", 22, 1),
+    ("3", "RED", "37", "SW_ROTATE_RIGHT", 26, 2),
+    ("4", "YELLOW", "19", "SW_ROTATE_LEFT", 10, 3),
+    ("5", "GREY", "21", "SW_FORWARDS", 9, 4),
+    ("6", "BLUE", "22", "SW_REVERSE", 25, 5),
+    ("7", "BROWN", "23", "SW_PUT_DOWN", 11, 6),
+    ("8", "ORANGE", "24", "SW_PICK_UP", 8, 7),
+    ("9", "GREEN", "26", "SW_TALK", 7, 8),
+]
+
+for gearbox_pin, _colour, pi_pin, net, _bcm, _order in SWITCHES:
+    stub_label(gearbox[gearbox_pin], net, "L")
+    stub_label(pi[pi_pin], net, "R")
+
+stub_label(gearbox["1"], "GND", "L")   # WHITE - common return
+stub_label(gearbox["10"], "MOTOR_A", "R")
+stub_label(gearbox["11"], "MOTOR_B", "R")
+
+text_note(
+    "INTERROGATION SWITCHES - all inputs, internal pull-ups, ACTIVE LOW.\\n"
+    "White is the common ground return for all eight.\\n"
+    "\\n"
+    "  colour   order  action         BCM  Pi pin\\n"
+    "  purple     1    stop            22    15\\n"
+    "  red        2    rotate right    26    37\\n"
+    "  yellow     3    rotate left     10    19\\n"
+    "  grey       4    forwards         9    21\\n"
+    "  blue       5    reverse         25    22\\n"
+    "  brown      6    put down        11    23\\n"
+    "  orange     7    pick up          8    24\\n"
+    "  green      8    talk             7    26\\n"
+    "\\n"
+    "ARM LIMIT SWITCHES are in series inside the gearbox on BROWN and ORANGE.\\n"
+    "When an arm reaches its travel limit that circuit OPENS - the controller\\n"
+    "sees the switch release mid-action and stops. Without it the mechanism\\n"
+    "strains against its stop.",
+    (241.3, 215.9),
+)
+
+# --------------------------------------------------------------------------
 # Emit
 # --------------------------------------------------------------------------
 
