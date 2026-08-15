@@ -1,0 +1,229 @@
+"""Lay out hardware/verbot.kicad_sch.
+
+One-shot scaffolding - see README.md. The generated file is authoritative once
+eeschema has touched it.
+
+Layout is a single A3 sheet: Pi header centred, module blocks around it.
+Signals travel by net label off short pin stubs rather than long routed wires,
+which is the readable convention for a 40-pin part and keeps this file
+manageable.
+"""
+
+from kicadgen import (
+    Pin,
+    absolute_pin,
+    assert_grid,
+    lib_symbol,
+    pin_positions,
+    uid,
+)
+
+ROOT_UUID = uid()
+PROJECT = "verbot"
+
+# Every symbol placed on the sheet: (lib, name). Drives the lib_symbols cache.
+USED_SYMBOLS: list[tuple[str, str]] = []
+
+BODY: list[str] = []
+
+STUB = 3.81  # 3 * 1.27 - stub length from a pin to its net label
+
+
+def use(lib: str, name: str) -> str:
+    if (lib, name) not in USED_SYMBOLS:
+        USED_SYMBOLS.append((lib, name))
+    return f"{lib}:{name}"
+
+
+def sym(lib, name, ref, value, at, rot=0, hide_value=False):
+    """Place a symbol instance and return its pin-position lookup."""
+    lib_id = use(lib, name)
+    pins = pin_positions(lib, name) if lib != "verbot" else _project_pins(name)
+    x, y = at
+    assert_grid(at)
+    value_effects = "(hide yes)" if hide_value else ""
+    pin_blocks = "\n".join(f'\t\t(pin "{n}" (uuid "{uid()}"))' for n in pins)
+    BODY.append(
+        f"""	(symbol
+		(lib_id "{lib_id}")
+		(at {x} {y} {rot})
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "{uid()}")
+		(property "Reference" "{ref}" (at {x} {y - 2.54} 0)
+			(effects (font (size 1.27 1.27)) (justify left)))
+		(property "Value" "{value}" (at {x} {y + 2.54} 0)
+			(effects (font (size 1.27 1.27)) (justify left) {value_effects}))
+{pin_blocks}
+		(instances
+			(project "{PROJECT}"
+				(path "/{ROOT_UUID}" (reference "{ref}") (unit 1))))
+	)"""
+    )
+    return {number: absolute_pin(at, pin) for number, pin in pins.items()}
+
+
+def _project_pins(name: str) -> dict[str, Pin]:
+    """pin_positions() for the project library, which is not in SYMBOL_DIR."""
+    import kicadgen
+
+    original = kicadgen.SYMBOL_DIR
+    kicadgen.SYMBOL_DIR = ".."
+    try:
+        return kicadgen.pin_positions("verbot", name)
+    finally:
+        kicadgen.SYMBOL_DIR = original
+
+
+def wire(start, end):
+    assert_grid(start, end)
+    BODY.append(
+        f"""	(wire (pts (xy {start[0]} {start[1]}) (xy {end[0]} {end[1]}))
+		(stroke (width 0) (type default)) (uuid "{uid()}"))"""
+    )
+
+
+def label(text, at, rot=0):
+    assert_grid(at)
+    BODY.append(
+        f"""	(label "{text}" (at {at[0]} {at[1]} {rot})
+		(effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "{uid()}"))"""
+    )
+
+
+def nc(at):
+    """No-connect flag. Must sit exactly on a pin or ERC flags it as dangling."""
+    assert_grid(at)
+    BODY.append(f'	(no_connect (at {at[0]} {at[1]}) (uuid "{uid()}"))')
+
+
+def text_note(body, at, size=1.27):
+    BODY.append(
+        f"""	(text "{body}" (at {at[0]} {at[1]} 0)
+		(effects (font (size {size} {size})) (justify left top)) (uuid "{uid()}"))"""
+    )
+
+
+def stub_label(pin_xy, net, direction):
+    """Draw a short stub off a pin and label it. direction: 'L' or 'R'."""
+    dx = -STUB if direction == "L" else STUB
+    end = (round(pin_xy[0] + dx, 2), pin_xy[1])
+    wire(pin_xy, end)
+    label(net, end)
+
+
+def _lib_symbol_any(lib, name):
+    """lib_symbol() that also resolves the project library at ../verbot.kicad_sym."""
+    import kicadgen
+
+    if lib != "verbot":
+        return lib_symbol(lib, name)
+    original = kicadgen.SYMBOL_DIR
+    kicadgen.SYMBOL_DIR = ".."
+    try:
+        return kicadgen.lib_symbol(lib, name)
+    finally:
+        kicadgen.SYMBOL_DIR = original
+
+
+# --------------------------------------------------------------------------
+# Power tree
+# --------------------------------------------------------------------------
+
+PI_AT = (215.9, 148.59)
+
+pi = sym("Connector", "Raspberry_Pi_2_3", "J1", "Raspberry Pi Zero 2 W", PI_AT)
+shim = sym("verbot", "OnOff_SHIM", "M1", "Pimoroni OnOff SHIM", (69.85, 63.5))
+usb = sym("Connector", "USB_B_Micro", "J2", "5V USB power bank", (19.05, 63.5))
+
+# USB bank -> SHIM. VBUS is pin 1 and shield/GND pin 5 on USB_B_Micro; confirm
+# with pin_positions("Connector", "USB_B_Micro") and adjust if the stock symbol
+# numbers them differently.
+stub_label(usb["1"], "VBUS_IN", "R")
+stub_label(usb["5"], "GND", "R")
+
+# This is a power-only connection to a USB power bank; the data/ID/shield
+# pins are intentionally unused, and J2 is not touched by any later task.
+nc(usb["2"])  # D-
+nc(usb["3"])  # D+
+nc(usb["4"])  # ID
+nc(usb["SH"])  # Shield
+
+# Pi power pins. Pin numbers are physical header positions.
+PI_5V = ["2", "4"]
+PI_3V3 = ["1", "17"]
+PI_GND = ["6", "9", "14", "20", "25", "30", "34", "39"]
+
+for number in PI_5V:
+    stub_label(pi[number], "+5V", "L")
+for number in PI_3V3:
+    stub_label(pi[number], "+3V3", "L")
+for number in PI_GND:
+    stub_label(pi[number], "GND", "R")
+
+# OnOff SHIM: USB in, 5V out to the Pi rail, three GPIO lines.
+stub_label(shim["1"], "VBUS_IN", "L")  # USB_5V_IN
+stub_label(shim["2"], "GND", "L")
+stub_label(shim["3"], "+5V", "R")  # 5V_OUT
+stub_label(shim["4"], "SHIM_BTN", "R")  # BTN  - BCM17, Pi pin 11
+stub_label(shim["5"], "SHIM_LED", "R")  # LED  - BCM27, Pi pin 13
+stub_label(shim["6"], "SHIM_POWEROFF", "R")  # POWEROFF - BCM4, Pi pin 7
+
+stub_label(pi["11"], "SHIM_BTN", "L")
+stub_label(pi["13"], "SHIM_LED", "L")
+stub_label(pi["7"], "SHIM_POWEROFF", "L")
+
+# Power flags. Without one per externally-driven net, ERC errors with
+# power_pin_not_driven. GND does not need one: the stock USB_B_Micro symbol
+# types its pin 5 as a power output, so GND is already driven and adding a
+# PWR_FLAG there trips a pin_to_pin "two power outputs" conflict instead.
+for index, (net, at) in enumerate(
+    [("+5V", (44.45, 105.41)), ("+3V3", (69.85, 105.41))]
+):
+    flag = sym("power", "PWR_FLAG", f"#FLG0{index + 1}", "PWR_FLAG", at, hide_value=True)
+    label(net, flag["1"])
+
+text_note(
+    "POWER: 5V USB bank -> OnOff SHIM -> Pi 5V rail and DRV8833 VCC.\\n"
+    "Motor current therefore passes through the SHIM load switch (~2A).\\n"
+    "Cap VERBOT_ACTION_SPEED near +/-60 and rely on C1 for transients.",
+    (25.4, 120.65),
+)
+
+# --------------------------------------------------------------------------
+# Emit
+# --------------------------------------------------------------------------
+
+lib_cache = "\n".join(_lib_symbol_any(lib, name) for lib, name in USED_SYMBOLS)
+
+DOC = f"""(kicad_sch
+	(version 20260306)
+	(generator "verbot-generate-schematic")
+	(generator_version "10.0")
+	(uuid "{ROOT_UUID}")
+	(paper "A3")
+	(title_block
+		(title "verbot-pi-ng wiring")
+		(date "2026-08-15")
+		(rev "1")
+		(comment 1 "Wiring documentation - not a PCB design")
+		(comment 2 "Pin map source of truth: src/verbot/config.py")
+	)
+	(lib_symbols
+{lib_cache}
+	)
+{chr(10).join(BODY)}
+	(sheet_instances
+		(path "/" (page "1"))
+	)
+	(embedded_fonts no)
+)
+"""
+
+if __name__ == "__main__":
+    with open("../verbot.kicad_sch", "w") as handle:
+        handle.write(DOC)
+    print(f"wrote hardware/verbot.kicad_sch ({len(BODY)} objects)")
