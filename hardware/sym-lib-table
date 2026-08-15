@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "verbot")(type "KiCad")(uri "${KIPRJMOD}/verbot.kicad_sym")(options "")(descr "verbot-pi-ng module block symbols"))
+)
