@@ -128,6 +128,33 @@ Both PWM channels come from one overlay:
 
 **Free:** BCM 5, 14, 15, 20, 23, 24.
 
+### Count the I2S pins twice
+
+The three I2S lines sit next to pins that fail silently when you are off by one:
+
+| Intended | Header | Neighbour | What you get |
+|----------|--------|-----------|--------------|
+| BCLK | 12 | **14 = GND** | Bit clock grounded. Dead silence. |
+| DIN | 40 | **38 = BCM 20, PCM_DIN** | Data on the input pin. Dead silence. |
+| LRCLK | 35 | 33 = BCM 13 (`IN2`) | Word clock into the motor driver. |
+
+None of these produce an error anywhere. The overlay still registers the card,
+`aplay -l` still lists the MAX98357A, `pinctrl get 18-21` still reports `a0` on
+all three, and `/proc/asound/card0/pcm0p/sub0/hw_params` still reads `RUNNING`
+with the pointer advancing. The Pi is genuinely clocking valid I2S — it is just
+not arriving. Every software check passes while the speaker stays silent.
+
+If there is no sound, check continuity from the header pin to the breakout pad
+**before** touching the overlay. `speaker-test -D plughw:0,0` returning 0 says
+nothing about whether audio reached the amp.
+
+Confirm the amp is alive with a meter instead: SD_MODE on the Adafruit board
+sits at ~0.45 V (its 1 MΩ pull-up against the chip's 100 kΩ internal pulldown),
+which the MAX98357A reads as enabled in (L+R)/2 mono. Below 0.16 V is shutdown.
+That reading also means `no-sdmode` is correct for this board — SD_MODE is not
+wired to a GPIO, so the `sdmode` overlay variant does nothing here except claim
+BCM 4, which the OnOff SHIM needs.
+
 ## DRV8833 carrier wiring
 
 The common 12-pin breakout (`IN1`–`IN4`, `OUT1`–`OUT4`, `VCC`, `GND`, `EEP`,
