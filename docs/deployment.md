@@ -8,53 +8,84 @@ that a Zero would struggle to finish.
 
 ## 2. Headless first boot
 
-With the card still in your workstation, create `custom.toml` at the root of the
-`bootfs` partition — no `.txt` extension. It is read once, on first boot, and
-gets you SSH and Wi-Fi without ever attaching a display:
+Raspberry Pi OS ships in two variants that provision from **different files**.
+Check `bootfs` before writing anything — the wrong file is silently ignored,
+and you get the interactive user-creation wizard on a robot with no keyboard:
 
-```toml
-config_version = 1
+| On `bootfs` | Variant | Provision with |
+|---|---|---|
+| `user-data`, `meta-data`, `network-config` | cloud-init | `user-data` + `network-config` |
+| neither, and `cmdline.txt` contains `init=/usr/lib/raspberrypi-sys-mods/firstboot` | standard | `custom.toml` |
 
-[system]
-hostname = "verbot"
+We use the **cloud-init** variant. Replace the two stock templates, which ship
+entirely commented out and therefore do nothing.
 
-[user]
-name = "bkrein"
-password = "$6$..."            # openssl passwd -6 'yourpassword'
-password_encrypted = true
+`user-data`:
 
-[ssh]
-enabled = true
-password_authentication = false
-authorized_keys = [ "ssh-ed25519 AAAA... you@workstation" ]
+```yaml
+#cloud-config
+hostname: verbot
+manage_etc_hosts: true
 
-[wlan]
-ssid = "YourNetwork"
-password = "your-wifi-passphrase"
-password_encrypted = false     # default is true — see below
-hidden = false
-country = "US"
+users:
+  - name: bkrein
+    shell: /bin/bash
+    groups: [adm, sudo, users, dialout, audio, video, plugdev, netdev]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: false
+    passwd: "$6$..."          # openssl passwd -6 'yourpassword'
+    ssh_authorized_keys:
+      - "ssh-ed25519 AAAA... you@workstation"
 
-[locale]
-keymap = "us"
-timezone = "America/New_York"
+ssh_pwauth: false
+timezone: US/Eastern
+
+runcmd:
+  - systemctl enable --now ssh
 ```
 
-`password_encrypted` defaults to **true** in both `[user]` and `[wlan]`, so a
-plaintext password left without the flag is used verbatim as a hash and locks
-you out. The two encrypted forms are also different algorithms: `[user]` wants a
-crypt hash from `openssl passwd -6`, `[wlan]` wants the 64-hex PSK from
-`wpa_passphrase 'SSID' 'passphrase'`. Reusing an `openssl` hash in `[wlan]`
-parses fine and then silently never associates.
+`network-config`:
 
-The pre-Bookworm `ssh` and `wpa_supplicant.conf` files do **not** work here.
+```yaml
+network:
+  version: 2
+  wifis:
+    wlan0:
+      dhcp4: true
+      optional: true
+      access-points:
+        "YourNetwork":
+          password: "your-wifi-passphrase"
+      regulatory-domain: US
+```
+
+Then **bump `instance_id` in `meta-data`**. cloud-init compares it against a
+cached copy and skips provisioning entirely when it matches, so a card that has
+booted once ignores your edits until that string changes.
+
+Keep the group list to groups that exist on a stock image. `gpio` and `i2c` are
+added in step 6 — naming a nonexistent group makes `useradd` fail and takes the
+whole user creation down with it, landing you back at the wizard.
+
+`optional: true` keeps a missing access point from blocking boot. The robot is
+built to run its panel buttons with no network (bring-up checklist step 7), so a
+hung boot is the worse failure.
+
+### If it comes up at the wizard anyway
+
+Reseat the card and read `bootfs`. The state of the provisioning file says which
+half of the pipeline broke:
+
+- **`custom.toml` still present** — you are on the cloud-init variant and it was
+  never read. The standard variant *deletes* the file after applying it.
+- **cloud-init ran but did nothing** — `instance_id` was unchanged, or the YAML
+  has a tab in it. Check `/var/log/cloud-init.log` on `rootfs`.
+- **The Pi has no network but is otherwise configured** — the Zero 2 W radio is
+  2.4 GHz only. Confirm the SSID exists on 2.4 GHz with WPA2.
+
+The pre-Bookworm `ssh` and `wpa_supplicant.conf` files work on neither variant.
 Trixie uses NetworkManager, and `wpa_supplicant.conf` in the boot partition is
-ignored — a first boot with no network is usually this, not bad credentials.
-
-The Zero 2 W's radio is 2.4 GHz only. Confirm the SSID exists on 2.4 GHz with
-WPA2 before suspecting the file. If the Pi still does not appear, reseat the
-card in your workstation and read `/var/log/firstboot.log` from the root
-partition: unrecognised keys are warned about there.
+ignored outright.
 
 ## 3. Firmware config
 
