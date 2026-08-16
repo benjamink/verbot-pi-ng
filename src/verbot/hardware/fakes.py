@@ -121,3 +121,11 @@ class FakeSpeech:
 
     async def close(self) -> None:
         self.closed = True
+
+
+class FakePower:
+    def __init__(self) -> None:
+        self.shutdown_called = False
+
+    async def shutdown(self) -> None:
+        self.shutdown_called = True

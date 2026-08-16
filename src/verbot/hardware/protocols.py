@@ -63,3 +63,11 @@ class StatusLed(Protocol):
 class SpeechEngine(Protocol):
     async def say(self, text: str) -> None: ...
     async def close(self) -> None: ...
+
+
+class SystemPower(Protocol):
+    """Power control for the machine the software runs on, not the robot."""
+
+    async def shutdown(self) -> None:
+        """Ask the operating system to power down. Returns once the request
+        is issued, which is well before the machine actually stops."""

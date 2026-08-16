@@ -3,9 +3,9 @@ from httpx import ASGITransport, AsyncClient
 from verbot.__main__ import build_app
 from verbot.actions import Action, Mode
 from verbot.config import Settings
-from verbot.hardware.fakes import FakeKeypad, FakeLed, FakeMotor, FakeSwitchBank
+from verbot.hardware.fakes import FakeKeypad, FakeLed, FakeMotor, FakePower, FakeSwitchBank
 from verbot.hardware.protocols import LedPattern
-from verbot.main_support import build_hardware, build_keypad
+from verbot.main_support import build_hardware, build_keypad, build_power
 
 
 def test_build_hardware_returns_fakes_when_hardware_disabled():
@@ -56,3 +56,15 @@ async def test_lifespan_stops_the_motor_on_shutdown():
     assert motor.speed == 0
     assert motor.closed
     assert app.state.led.pattern is LedPattern.OFF
+
+
+def test_build_power_returns_a_fake_when_hardware_disabled():
+    """The dev server must never be able to power off a development laptop."""
+    assert isinstance(build_power(Settings(use_real_hardware=False)), FakePower)
+
+
+async def test_fake_power_records_the_request_instead_of_acting():
+    power = FakePower()
+    assert power.shutdown_called is False
+    await power.shutdown()
+    assert power.shutdown_called is True

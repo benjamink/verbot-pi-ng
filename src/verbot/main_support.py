@@ -3,7 +3,7 @@
 import logging
 
 from verbot.config import Settings
-from verbot.hardware.protocols import Keypad, MotorDriver, StatusLed, SwitchBank
+from verbot.hardware.protocols import Keypad, MotorDriver, StatusLed, SwitchBank, SystemPower
 
 log = logging.getLogger(__name__)
 
@@ -39,3 +39,19 @@ def build_keypad(settings: Settings) -> tuple[Keypad | None, StatusLed | None]:
 
     bus = open_bus(settings)
     return Mcp23017Keypad(settings, bus=bus), Mcp23017Led(settings, bus=bus)
+
+
+def build_power(settings: Settings) -> SystemPower:
+    """Real power control on the Pi, a fake everywhere else.
+
+    The fake is not just convenience: without this branch, a development
+    machine running with a shutdown token configured would power itself off.
+    """
+    if not settings.use_real_hardware:
+        from verbot.hardware.fakes import FakePower
+
+        return FakePower()
+
+    from verbot.hardware.system_power import SubprocessPower
+
+    return SubprocessPower()
