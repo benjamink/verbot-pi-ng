@@ -4,14 +4,16 @@ Typing the path parameter as `Action` gets validation for free: an unknown
 action is a 422 rather than a silently ignored request.
 """
 
+import secrets
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
 from verbot.actions import Action, ControllerStatus
+from verbot.config import Settings
 from verbot.controller import Controller
-from verbot.hardware.protocols import SpeechEngine
+from verbot.hardware.protocols import SpeechEngine, SystemPower
 
 
 class SayRequest(BaseModel):
@@ -37,7 +39,12 @@ ControllerDep = Annotated[Controller, Depends(get_controller)]
 SpeechDep = Annotated[SpeechEngine, Depends(get_speech)]
 
 
-def create_app(controller: Controller, speech: SpeechEngine) -> FastAPI:
+def create_app(
+    controller: Controller,
+    speech: SpeechEngine,
+    settings: Settings,
+    power: SystemPower,
+) -> FastAPI:
     app = FastAPI(
         title="Verbot",
         description="Control a 1984 Tomy Verbot toy robot.",
@@ -82,5 +89,36 @@ def create_app(controller: Controller, speech: SpeechEngine) -> FastAPI:
     async def say(body: SayRequest, speech: SpeechDep) -> dict[str, str]:
         await speech.say(body.text)
         return {"spoken": body.text}
+
+    if settings.shutdown_token is not None:
+        expected = settings.shutdown_token.encode()
+
+        @app.post("/system/shutdown", tags=["system"], status_code=status.HTTP_202_ACCEPTED)
+        async def shutdown(
+            background: BackgroundTasks,
+            controller: ControllerDep,
+            x_verbot_token: Annotated[str | None, Header()] = None,
+        ) -> dict[str, str]:
+            """Power the machine off. Requires the configured token.
+
+            Registered only when a token is set, so the default deployment has
+            no such route at all rather than a route that always refuses.
+            """
+            if x_verbot_token is None or not secrets.compare_digest(
+                x_verbot_token.encode(), expected
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="invalid or missing shutdown token",
+                )
+
+            # Stop the robot before the machine goes: systemd's teardown would
+            # get there eventually, but not for a few hundred milliseconds, and
+            # not at all if the poweroff itself fails.
+            await controller.halt()
+            # A background task runs after the response is sent, so the 202
+            # reaches the caller rather than dying with the machine.
+            background.add_task(power.shutdown)
+            return {"status": "shutting down"}
 
     return app

@@ -61,5 +61,9 @@ class Settings(BaseSettings):
     keypad_poll_hz: float = 50.0
     keypad_debounce_samples: int = 2
 
+    # Shutdown endpoint. Unset means the route is never registered - see
+    # docs/deployment.md before turning it on.
+    shutdown_token: str | None = None
+
     # Hardware toggle: False runs entirely on fakes (dev machines).
     use_real_hardware: bool = False

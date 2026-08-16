@@ -11,7 +11,7 @@ from verbot.config import Settings
 from verbot.controller import Controller
 from verbot.discovery import ServiceAdvertiser
 from verbot.hardware.protocols import LedPattern
-from verbot.main_support import build_hardware, build_keypad
+from verbot.main_support import build_hardware, build_keypad, build_power
 from verbot.speech import EspeakEngine
 
 
@@ -19,6 +19,7 @@ def build_app(settings: Settings) -> FastAPI:
     motor, switches = build_hardware(settings)
     controller = Controller(motor=motor, switches=switches, settings=settings)
     keypad, led = build_keypad(settings)
+    power = build_power(settings)
     speech = EspeakEngine(settings)
     advertiser = ServiceAdvertiser(settings)
 
@@ -46,13 +47,14 @@ def build_app(settings: Settings) -> FastAPI:
             await controller.close()
             await speech.close()
 
-    app = create_app(controller=controller, speech=speech)
+    app = create_app(controller=controller, speech=speech, settings=settings, power=power)
     app.router.lifespan_context = lifespan
     # Expose the composed hardware for introspection and tests.
     app.state.motor = motor
     app.state.switches = switches
     app.state.keypad = keypad
     app.state.led = led
+    app.state.power = power
     return app
 
 

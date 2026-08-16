@@ -5,18 +5,36 @@ from verbot.actions import Action, Mode
 from verbot.api import create_app
 from verbot.config import Settings
 from verbot.controller import Controller
-from verbot.hardware.fakes import FakeMotor, FakeSpeech, FakeSwitchBank
+from verbot.hardware.fakes import FakeMotor, FakePower, FakeSpeech, FakeSwitchBank
 
 
 @pytest.fixture
 async def client_rig():
     motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
-    controller = Controller(motor=motor, switches=switches, settings=Settings())
+    settings = Settings()
+    controller = Controller(motor=motor, switches=switches, settings=settings)
     await controller.start()
-    app = create_app(controller=controller, speech=speech)
+    app = create_app(
+        controller=controller, speech=speech, settings=settings, power=FakePower()
+    )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client, controller, motor, switches, speech
+    await controller.close()
+
+
+@pytest.fixture
+async def secure_rig():
+    """An app with the shutdown endpoint switched on."""
+    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
+    settings = Settings(shutdown_token="correct-horse-battery-staple")
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+    power = FakePower()
+    app = create_app(controller=controller, speech=speech, settings=settings, power=power)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client, power, motor
     await controller.close()
 
 
@@ -89,3 +107,43 @@ async def test_say_rejects_empty_text(client_rig):
     response = await client.post("/say", json={"text": "   "})
     assert response.status_code == 422
     assert speech.spoken == []
+
+
+async def test_shutdown_route_is_absent_without_a_token(client_rig):
+    """Not 403 - absent. The capability should not even be advertised."""
+    client, *_ = client_rig
+    assert (await client.post("/system/shutdown")).status_code == 404
+
+    schema = (await client.get("/openapi.json")).json()
+    assert "/system/shutdown" not in schema["paths"]
+
+
+async def test_shutdown_rejects_a_missing_token(secure_rig):
+    client, power, _ = secure_rig
+    response = await client.post("/system/shutdown")
+    assert response.status_code == 401
+    assert power.shutdown_called is False
+
+
+async def test_shutdown_rejects_a_wrong_token(secure_rig):
+    client, power, _ = secure_rig
+    response = await client.post(
+        "/system/shutdown", headers={"X-Verbot-Token": "wrong"}
+    )
+    assert response.status_code == 401
+    assert power.shutdown_called is False
+
+
+async def test_shutdown_accepts_the_correct_token_and_stops_the_motor(secure_rig):
+    client, power, motor = secure_rig
+    await client.post("/actions/forwards")
+    assert motor.speed != 0
+
+    response = await client.post(
+        "/system/shutdown", headers={"X-Verbot-Token": "correct-horse-battery-staple"}
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {"status": "shutting down"}
+    assert power.shutdown_called is True
+    assert motor.speed == 0
