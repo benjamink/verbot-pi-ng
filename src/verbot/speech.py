@@ -45,14 +45,26 @@ class EspeakEngine:
                 self._proc = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
+                    # Captured, not discarded: espeak failing on a busy or
+                    # misrouted sound card is otherwise indistinguishable from
+                    # it speaking normally, which makes audio faults invisible.
+                    stderr=asyncio.subprocess.PIPE,
                 )
             except FileNotFoundError:
                 log.error("espeak-ng not installed - run: sudo apt install espeak-ng")
                 return
 
             try:
-                await self._proc.wait()
+                _, stderr = await self._proc.communicate()
+                if self._proc.returncode:
+                    log.warning(
+                        "espeak-ng exited %d saying %r: %s",
+                        self._proc.returncode,
+                        text,
+                        stderr.decode(errors="replace").strip() or "(no stderr)",
+                    )
+                else:
+                    log.info("said %r", text)
             finally:
                 self._proc = None
 
