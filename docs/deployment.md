@@ -6,7 +6,57 @@ Flash **64-bit Raspberry Pi OS (Trixie)**. The 64-bit build matters: it gets
 prebuilt aarch64 wheels for `pydantic-core`, avoiding a from-source Rust build
 that a Zero would struggle to finish.
 
-## 2. Firmware config
+## 2. Headless first boot
+
+With the card still in your workstation, create `custom.toml` at the root of the
+`bootfs` partition — no `.txt` extension. It is read once, on first boot, and
+gets you SSH and Wi-Fi without ever attaching a display:
+
+```toml
+config_version = 1
+
+[system]
+hostname = "verbot"
+
+[user]
+name = "bkrein"
+password = "$6$..."            # openssl passwd -6 'yourpassword'
+password_encrypted = true
+
+[ssh]
+enabled = true
+password_authentication = false
+authorized_keys = [ "ssh-ed25519 AAAA... you@workstation" ]
+
+[wlan]
+ssid = "YourNetwork"
+password = "your-wifi-passphrase"
+password_encrypted = false     # default is true — see below
+hidden = false
+country = "US"
+
+[locale]
+keymap = "us"
+timezone = "America/New_York"
+```
+
+`password_encrypted` defaults to **true** in both `[user]` and `[wlan]`, so a
+plaintext password left without the flag is used verbatim as a hash and locks
+you out. The two encrypted forms are also different algorithms: `[user]` wants a
+crypt hash from `openssl passwd -6`, `[wlan]` wants the 64-hex PSK from
+`wpa_passphrase 'SSID' 'passphrase'`. Reusing an `openssl` hash in `[wlan]`
+parses fine and then silently never associates.
+
+The pre-Bookworm `ssh` and `wpa_supplicant.conf` files do **not** work here.
+Trixie uses NetworkManager, and `wpa_supplicant.conf` in the boot partition is
+ignored — a first boot with no network is usually this, not bad credentials.
+
+The Zero 2 W's radio is 2.4 GHz only. Confirm the SSID exists on 2.4 GHz with
+WPA2 before suspecting the file. If the Pi still does not appear, reseat the
+card in your workstation and read `/var/log/firstboot.log` from the root
+partition: unrecognised keys are warned about there.
+
+## 3. Firmware config
 
 Append the contents of [`../config/config.txt.example`](../config/config.txt.example)
 to `/boot/firmware/config.txt` and reboot. Then verify:
@@ -25,7 +75,7 @@ If `npwm` reads 1, the single-channel `pwm` overlay is still in place. The
 DRV8833 needs `pwm-2chan`: it has no PHASE/ENABLE mode, so both IN1 and IN2
 need a PWM channel.
 
-## 3. System packages
+## 4. System packages
 
 ```bash
 sudo apt update
@@ -33,7 +83,7 @@ sudo apt install -y espeak-ng i2c-tools
 espeak-ng "hello"      # confirm audio reaches the speaker
 ```
 
-## 4. Install
+## 5. Install
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -44,7 +94,7 @@ uv sync --extra pi --frozen
 
 `--frozen` installs exactly the committed `uv.lock`.
 
-## 5. Permissions
+## 6. Permissions
 
 ```bash
 sudo usermod -aG gpio,i2c,audio "$USER"
@@ -54,7 +104,7 @@ Log out and back in. If writes to `/sys/class/pwm` still fail, check for a udev
 rule granting the `gpio` group access; add `/etc/udev/rules.d/99-pwm.rules` if
 your image lacks one.
 
-## 6. First run
+## 7. First run
 
 ```bash
 VERBOT_USE_REAL_HARDWARE=true uv run verbot
@@ -64,7 +114,7 @@ Without that variable the server runs on fakes and the robot will not move —
 useful for testing the API on any machine, confusing if you forget it on the Pi.
 Look for the absence of the `running on fake hardware` warning in the log.
 
-## 7. Service
+## 8. Service
 
 ```bash
 sudo cp config/verbot.service /etc/systemd/system/verbot@.service
