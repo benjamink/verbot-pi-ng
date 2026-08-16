@@ -8,12 +8,14 @@ import secrets
 from typing import Annotated
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 
 from verbot.actions import Action, ControllerStatus
 from verbot.config import Settings
 from verbot.controller import Controller
 from verbot.hardware.protocols import SpeechEngine, SystemPower
+from verbot.web import render_index
 
 
 class SayRequest(BaseModel):
@@ -25,6 +27,22 @@ class SayRequest(BaseModel):
         if not value.strip():
             raise ValueError("text must not be blank")
         return value
+
+
+class Speeds(BaseModel):
+    interrogation_speed: int
+    action_speed: int
+
+
+class SpeedsPatch(BaseModel):
+    """Both optional so a slider can send only the value it changed.
+
+    Bounds match set_speed_percent's, so a bad value is a 422 here rather than
+    a ValueError raised mid-action with the motor already turning.
+    """
+
+    interrogation_speed: int | None = Field(default=None, ge=0, le=100)
+    action_speed: int | None = Field(default=None, ge=-100, le=100)
 
 
 def get_controller(request: Request) -> Controller:
@@ -53,9 +71,40 @@ def create_app(
     app.state.controller = controller
     app.state.speech = speech
 
+    index_html = render_index(list(Action))
+
+    @app.get("/", include_in_schema=False, response_class=HTMLResponse)
+    async def index() -> HTMLResponse:
+        """The bring-up control page. Rendered once at startup, not per request."""
+        return HTMLResponse(index_html)
+
     @app.get("/healthz", tags=["system"])
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/speeds", tags=["control"], response_model=Speeds)
+    async def get_speeds() -> Speeds:
+        return Speeds(
+            interrogation_speed=settings.interrogation_speed,
+            action_speed=settings.action_speed,
+        )
+
+    @app.patch("/speeds", tags=["control"], response_model=Speeds)
+    async def patch_speeds(body: SpeedsPatch) -> Speeds:
+        """Adjust speeds live, for the measurements docs/deployment.md asks for.
+
+        The controller reads these off Settings each time it drives the motor,
+        so a change lands on the next action. Deliberately not persisted: the
+        values worth keeping belong in .env once measured.
+        """
+        if body.interrogation_speed is not None:
+            settings.interrogation_speed = body.interrogation_speed
+        if body.action_speed is not None:
+            settings.action_speed = body.action_speed
+        return Speeds(
+            interrogation_speed=settings.interrogation_speed,
+            action_speed=settings.action_speed,
+        )
 
     @app.get("/status", tags=["control"], response_model=ControllerStatus)
     async def get_status(controller: ControllerDep) -> ControllerStatus:

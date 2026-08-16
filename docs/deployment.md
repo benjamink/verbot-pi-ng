@@ -260,6 +260,11 @@ or add `Environment=` lines to the unit.
 
 ## Bring-up checklist
 
+There is a control page at **`http://verbot.local:8080/`** covering every step
+below except the panel buttons: action buttons, a large stop, live status, a
+speak box, live speed sliders, and a log of each request and response. It calls
+the same endpoints as the `curl` commands here, so either works.
+
 Work through these in order, with the robot **on a stand with its wheels off
 the ground** until step 5 passes. Keep the schematic open while you do —
 [`hardware/verbot-schematic.pdf`](../hardware/verbot-schematic.pdf)

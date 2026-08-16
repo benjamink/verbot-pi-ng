@@ -14,9 +14,7 @@ async def client_rig():
     settings = Settings()
     controller = Controller(motor=motor, switches=switches, settings=settings)
     await controller.start()
-    app = create_app(
-        controller=controller, speech=speech, settings=settings, power=FakePower()
-    )
+    app = create_app(controller=controller, speech=speech, settings=settings, power=FakePower())
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client, controller, motor, switches, speech
@@ -127,9 +125,7 @@ async def test_shutdown_rejects_a_missing_token(secure_rig):
 
 async def test_shutdown_rejects_a_wrong_token(secure_rig):
     client, power, _ = secure_rig
-    response = await client.post(
-        "/system/shutdown", headers={"X-Verbot-Token": "wrong"}
-    )
+    response = await client.post("/system/shutdown", headers={"X-Verbot-Token": "wrong"})
     assert response.status_code == 401
     assert power.shutdown_called is False
 
@@ -147,3 +143,66 @@ async def test_shutdown_accepts_the_correct_token_and_stops_the_motor(secure_rig
     assert response.json() == {"status": "shutting down"}
     assert power.shutdown_called is True
     assert motor.speed == 0
+
+
+async def test_get_speeds_reports_the_current_settings(client_rig):
+    client, *_ = client_rig
+    response = await client.get("/speeds")
+    assert response.status_code == 200
+    assert response.json() == {
+        "interrogation_speed": Settings().interrogation_speed,
+        "action_speed": Settings().action_speed,
+    }
+
+
+async def test_patch_speeds_changes_what_the_motor_is_driven_at(client_rig):
+    """The point of the sliders: the next action must use the new value."""
+    client, controller, motor, *_ = client_rig
+
+    response = await client.patch("/speeds", json={"interrogation_speed": 35})
+    assert response.status_code == 200
+    assert response.json()["interrogation_speed"] == 35
+
+    await client.post("/actions/forwards")
+    assert motor.speed == 35
+
+
+async def test_patch_speeds_accepts_a_partial_body(client_rig):
+    client, *_ = client_rig
+    response = await client.patch("/speeds", json={"action_speed": -60})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action_speed"] == -60
+    assert body["interrogation_speed"] == Settings().interrogation_speed
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"interrogation_speed": 101},
+        {"interrogation_speed": -1},
+        {"action_speed": -101},
+        {"action_speed": 101},
+    ],
+)
+async def test_patch_speeds_rejects_out_of_range(client_rig, payload):
+    """set_speed_percent would raise ValueError mid-action otherwise."""
+    client, *_ = client_rig
+    response = await client.patch("/speeds", json=payload)
+    assert response.status_code == 422
+
+
+async def test_index_serves_the_control_page(client_rig):
+    client, *_ = client_rig
+    response = await client.get("/")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    body = response.text
+    # Every action must be reachable from the page.
+    for action in Action:
+        assert action.value in body
+    # And the three things asked for beyond the buttons.
+    assert 'id="say-text"' in body
+    assert 'id="status-panel"' in body
+    assert 'id="log"' in body
