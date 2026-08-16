@@ -64,6 +64,7 @@ dd { margin: 0; font-weight: 600; }
   max-height: 14rem; overflow-y: auto; margin: 0;
 }
 .err { color: var(--stop); }
+.hint { color: var(--muted); font-size: .8rem; margin: .5rem 0 0; }
 """
 
 _SCRIPT = """
@@ -103,7 +104,9 @@ function paint(s) {
 document.querySelectorAll('[data-action]').forEach(b => {
   b.onclick = async () => paint(await call('POST', `/actions/${b.dataset.action}`));
 });
-document.getElementById('stop').onclick = async () => paint(await call('POST', '/stop'));
+// /halt, not /stop: /stop interrogates for the stop cam and keeps the motor
+// running for seconds. A control labelled STOP must cut the motor now.
+document.getElementById('stop').onclick = async () => paint(await call('POST', '/halt'));
 
 document.getElementById('say-go').onclick = async () => {
   const el = document.getElementById('say-text');
@@ -147,10 +150,11 @@ setInterval(poll, 1000);
 
 
 def render_index(actions: Iterable[Action]) -> str:
+    # Every action, stop included: the oversized red control is /halt, which is
+    # a different operation from driving the drum round to the stop cam.
     buttons = "\n".join(
         f'      <button data-action="{a.value}">{a.value.replace("_", " ")}</button>'
         for a in actions
-        if a is not Action.STOP  # stop has its own oversized control
     )
     return f"""<!doctype html>
 <html lang="en">
@@ -165,6 +169,8 @@ def render_index(actions: Iterable[Action]) -> str:
 
 <section>
   <button id="stop">STOP</button>
+  <p class="hint">Cuts the motor immediately. The <em>stop</em> action below
+  instead drives the drum round to the stop cam, which takes a few seconds.</p>
 </section>
 
 <section>

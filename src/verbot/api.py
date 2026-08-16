@@ -134,6 +134,22 @@ def create_app(
         await controller.request_action(Action.STOP)
         return controller.status
 
+    @app.post(
+        "/halt",
+        tags=["control"],
+        status_code=status.HTTP_202_ACCEPTED,
+        response_model=ControllerStatus,
+    )
+    async def halt(controller: ControllerDep) -> ControllerStatus:
+        """Cut the motor now, without interrogating.
+
+        Distinct from /stop, which drives the drum round to the stop cam and
+        takes seconds of movement to get there. This is what an emergency
+        control should be bound to.
+        """
+        await controller.halt()
+        return controller.status
+
     @app.post("/say", tags=["speech"], status_code=status.HTTP_202_ACCEPTED)
     async def say(body: SayRequest, speech: SpeechDep) -> dict[str, str]:
         await speech.say(body.text)

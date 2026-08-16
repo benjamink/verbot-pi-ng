@@ -206,3 +206,37 @@ async def test_index_serves_the_control_page(client_rig):
     assert 'id="say-text"' in body
     assert 'id="status-panel"' in body
     assert 'id="log"' in body
+
+
+async def test_halt_cuts_the_motor_without_interrogating(client_rig):
+    """The emergency control must not drive the drum looking for the stop cam."""
+    client, controller, motor, *_ = client_rig
+
+    await client.post("/actions/forwards")
+    assert motor.speed == Settings().interrogation_speed
+
+    response = await client.post("/halt")
+
+    assert response.status_code == 202
+    assert motor.speed == 0
+    assert response.json()["mode"] == Mode.IDLE
+
+
+async def test_stop_still_interrogates_for_the_stop_cam(client_rig):
+    """/stop parks the mechanism; /halt is the one that just cuts power."""
+    client, controller, motor, *_ = client_rig
+
+    await client.post("/stop")
+
+    assert motor.speed == Settings().interrogation_speed
+    assert controller.status.mode is Mode.INTERROGATING
+
+
+async def test_page_wires_the_big_button_to_halt_not_stop(client_rig):
+    """A control labelled STOP must not start the motor."""
+    client, *_ = client_rig
+    body = (await client.get("/")).text
+
+    assert "'/halt'" in body
+    # and the gearbox stop position stays reachable as an ordinary action
+    assert 'data-action="stop"' in body
