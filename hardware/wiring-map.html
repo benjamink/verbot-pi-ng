@@ -300,6 +300,78 @@
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
+
+  /* ---- Print ---------------------------------------------------------- */
+  @media print {
+    /* One section per sheet. Change `size` to `A4` for metric paper. */
+    @page { size: letter portrait; margin: 14mm 13mm 13mm; }
+
+    /* Always print the light palette: the wire colours are data, and a dark
+       ground would swallow a bench printout. */
+    :root, :root[data-theme="dark"], :root:not([data-theme="light"]) {
+      --ground:      #FFFFFF;
+      --surface:     #FFFFFF;
+      --surface-2:   #F2F4F7;
+      --ink:         #101318;
+      --ink-soft:    #4C545F;
+      --ink-faint:   #6E7684;
+      --rule:        #A9B0BC;
+      --rule-soft:   #CFD4DD;
+      --accent:      #175A66;
+      --accent-soft: #E6F0F2;
+      --warn:        #823D0F;
+      --warn-soft:   #F8EDE2;
+
+      --w-white:  #8E97A6;
+      --w-purple: #6535BC;
+      --w-red:    #BE2A22;
+      --w-yellow: #8F6704;
+      --w-grey:   #69727F;
+      --w-blue:   #1B58AC;
+      --w-brown:  #74472A;
+      --w-orange: #B75B12;
+      --w-green:  #17663A;
+
+      --shadow: none;
+    }
+
+    /* Keep swatches, wire strokes and callout tints — they carry meaning. */
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    body { background: #fff; font-size: 10.5pt; line-height: 1.5; padding: 0; }
+    .wrap { max-width: none; }
+
+    /* Nothing scrolls on paper: let the clipped content lay out full width. */
+    .scroll, .plate { overflow: visible; }
+    table { min-width: 0; font-size: 9pt; }
+    th, td { padding: 5px 10px; }
+    figure svg { min-width: 0; width: 100%; }
+    figure { box-shadow: none; }
+
+    .masthead { padding: 0 0 18px; margin-bottom: 26px; }
+    h1 { font-size: 27pt; }
+    .standfirst { font-size: 11pt; }
+    .meta { font-size: 8.5pt; }
+    .lede { margin: 12px 0 16px; }
+
+    /* Page 1 masthead + system map, then a page per section. */
+    section { margin-bottom: 0; break-before: page; }
+    .wrap > section:first-of-type { break-before: auto; }
+
+    /* Nothing that reads as one unit may straddle a fold. */
+    figure, .note, .keyline, .grid2 > div, .scroll, tr, footer { break-inside: avoid; }
+    h2, h3, .lede, caption, thead { break-after: avoid; }
+
+    .grid2 { gap: 18px 26px; }
+    figure { margin-bottom: 20px; }
+    .plate { padding: 16px 14px 4px; }
+    figcaption { font-size: 9.5pt; padding: 10px 14px 12px; }
+    .note, .keyline { margin: 18px 0; padding: 12px 16px; }
+    .note p, .keyline p { font-size: 9.5pt; }
+
+    footer { break-before: auto; margin-top: 28px; padding-top: 14px; font-size: 9pt; }
+    footer a { color: var(--ink); text-decoration: none; }
+  }
 </style>
 
 <div class="wrap">
