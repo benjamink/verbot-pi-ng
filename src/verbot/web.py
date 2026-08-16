@@ -65,6 +65,7 @@ dd { margin: 0; font-weight: 600; }
 }
 .err { color: var(--stop); }
 .hint { color: var(--muted); font-size: .8rem; margin: .5rem 0 0; }
+label.inline { display: flex; gap: .5rem; align-items: flex-start; margin: 0; }
 """
 
 _SCRIPT = """
@@ -110,7 +111,9 @@ document.getElementById('stop').onclick = async () => paint(await call('POST', '
 
 document.getElementById('say-go').onclick = async () => {
   const el = document.getElementById('say-text');
-  if (el.value.trim()) await call('POST', '/say', { text: el.value });
+  if (!el.value.trim()) return;
+  const animate = document.getElementById('say-animate').checked;
+  paint(await call('POST', '/say', { text: el.value, animate }));
 };
 document.getElementById('say-text').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('say-go').click();
@@ -195,6 +198,13 @@ def render_index(actions: Iterable[Action]) -> str:
     <input type="text" id="say-text" placeholder="I am Verbot" maxlength="500">
     <button id="say-go">Say</button>
   </div>
+  <p class="hint">
+    <label class="inline">
+      <input type="checkbox" id="say-animate" checked>
+      Move the mouth — runs the talk action while the phrase plays, then parks
+      at the stop cam. Uncheck to test the speaker alone.
+    </label>
+  </p>
 </section>
 
 <section>

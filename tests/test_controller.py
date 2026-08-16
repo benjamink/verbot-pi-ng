@@ -216,3 +216,38 @@ async def test_halt_leaves_no_watchdog_running(rig):
     await asyncio.sleep(0.1)
 
     assert controller.status.mode is Mode.IDLE
+
+
+async def test_wait_until_acting_returns_when_the_action_engages(rig):
+    controller, motor, switches = rig
+
+    await controller.request_action(Action.TALK)
+    waiter = asyncio.create_task(controller.wait_until_acting(Action.TALK, timeout=1.0))
+    await asyncio.sleep(0)
+    await switches.activate(Action.TALK)
+
+    assert await waiter is True
+    assert controller.status.mode is Mode.ACTING
+
+
+async def test_wait_until_acting_gives_up_when_interrogation_faults(rig):
+    """No mechanism attached: the watchdog faults and the waiter must not hang."""
+    controller, motor, switches = rig
+
+    await controller.request_action(Action.TALK)
+    assert await controller.wait_until_acting(Action.TALK, timeout=1.0) is False
+    assert controller.status.mode is Mode.FAULT
+
+
+async def test_wait_until_acting_gives_up_at_its_own_timeout():
+    """Bounded even when the controller's own watchdog is far away."""
+    motor, switches = FakeMotor(), FakeSwitchBank()
+    controller = Controller(
+        motor=motor, switches=switches, settings=Settings(interrogation_timeout_s=30.0)
+    )
+    await controller.start()
+    try:
+        await controller.request_action(Action.TALK)
+        assert await controller.wait_until_acting(Action.TALK, timeout=0.05) is False
+    finally:
+        await controller.close()

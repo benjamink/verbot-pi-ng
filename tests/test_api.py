@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -33,6 +35,20 @@ async def secure_rig():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client, power, motor
+    await controller.close()
+
+
+@pytest.fixture
+async def impatient_rig():
+    """Like client_rig but the interrogation watchdog fires almost at once."""
+    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
+    settings = Settings(interrogation_timeout_s=0.05)
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+    app = create_app(controller=controller, speech=speech, settings=settings, power=FakePower())
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client, controller, motor, switches, speech
     await controller.close()
 
 
@@ -240,3 +256,60 @@ async def test_page_wires_the_big_button_to_halt_not_stop(client_rig):
     assert "'/halt'" in body
     # and the gearbox stop position stays reachable as an ordinary action
     assert 'data-action="stop"' in body
+
+
+async def test_say_without_animate_leaves_the_motor_alone(client_rig):
+    """Bring-up step 6 tests the speaker without moving anything."""
+    client, controller, motor, switches, speech = client_rig
+
+    response = await client.post("/say", json={"text": "hello"})
+
+    assert response.status_code == 202
+    assert response.json() == {"spoken": "hello", "animated": False}
+    assert motor.speed == 0
+    assert controller.status.mode is Mode.IDLE
+
+
+async def test_say_with_animate_runs_the_talk_action_then_parks(client_rig):
+    """The mouth must be moving before the phrase starts, and stop after."""
+    client, controller, motor, switches, speech = client_rig
+
+    async def until_desired(action):
+        """Bounded: a test must fail, not hang, if the state never arrives."""
+        for _ in range(500):
+            if controller.status.desired_action is action:
+                return True
+            await asyncio.sleep(0.002)
+        return False
+
+    async def engage_then_park():
+        # Reach ACTING so the phrase is spoken with the mouth moving...
+        if not await until_desired(Action.TALK):
+            return
+        await switches.activate(Action.TALK)
+        # ...then let the trailing interrogation for the stop cam complete.
+        if not await until_desired(Action.STOP):
+            return
+        await switches.activate(Action.STOP)
+
+    helper = asyncio.create_task(engage_then_park())
+    response = await client.post("/say", json={"text": "hello", "animate": True})
+    await helper
+
+    assert response.status_code == 202
+    assert response.json() == {"spoken": "hello", "animated": True}
+    assert speech.spoken == ["hello"]
+    assert motor.speed == 0
+    assert controller.status.mode is Mode.IDLE
+
+
+async def test_say_with_animate_still_speaks_when_the_mouth_never_engages(impatient_rig):
+    """No mechanism attached: a still mouth must not cost you the phrase."""
+    client, controller, motor, _switches, speech = impatient_rig
+
+    response = await client.post("/say", json={"text": "hello", "animate": True})
+
+    assert response.status_code == 202
+    assert response.json() == {"spoken": "hello", "animated": False}
+    assert speech.spoken == ["hello"]
+    assert controller.status.mode is Mode.FAULT

@@ -31,6 +31,9 @@ class Controller:
         self._current: Action | None = None
         self._desired: Action | None = None
         self._timeout_task: asyncio.Task[None] | None = None
+        # Pulsed on every mode change so callers can await a transition rather
+        # than poll the status property.
+        self._changed = asyncio.Event()
 
     async def start(self) -> None:
         await self._motor.open()
@@ -54,6 +57,7 @@ class Controller:
         """
         self._cancel_timeout()
         self._mode = Mode.IDLE
+        self._notify()
         self._desired = None
         await self._motor.set_speed_percent(0)
 
@@ -64,6 +68,33 @@ class Controller:
             current_action=self._current,
             desired_action=self._desired,
         )
+
+    def _notify(self) -> None:
+        self._changed.set()
+        self._changed.clear()
+
+    async def wait_until_acting(self, action: Action, timeout: float) -> bool:
+        """Block until `action` is actually running. False if it never gets there.
+
+        Speech has to start when the mouth starts moving, not when the request
+        is accepted — interrogation takes seconds, and can fault. Returns False
+        on fault or timeout rather than raising: a still mouth is a reason to
+        speak anyway, not to abandon the phrase.
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while True:
+            if self._mode is Mode.ACTING and self._current is action:
+                return True
+            if self._mode is Mode.FAULT:
+                return False
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return False
+            try:
+                await asyncio.wait_for(self._changed.wait(), timeout=remaining)
+            except TimeoutError:
+                return False
 
     async def request_action(self, action: Action) -> None:
         """Begin interrogating for `action`. Returns as soon as the motor starts."""
@@ -80,6 +111,7 @@ class Controller:
         log.info("interrogating for %s", action)
         self._desired = action
         self._mode = Mode.INTERROGATING
+        self._notify()
         self._start_timeout()
         await self._motor.set_speed_percent(self._settings.interrogation_speed)
 
@@ -109,10 +141,12 @@ class Controller:
         if action is Action.STOP:
             log.info("reached stop position")
             self._mode = Mode.IDLE
+            self._notify()
             await self._motor.set_speed_percent(0)
         else:
             log.info("gears in position, performing %s", action)
             self._mode = Mode.ACTING
+            self._notify()
             await self._motor.set_speed_percent(self._settings.action_speed)
 
     def _start_timeout(self) -> None:
@@ -128,5 +162,6 @@ class Controller:
         await asyncio.sleep(self._settings.interrogation_timeout_s)
         log.error("interrogation timed out waiting for %s - stopping motor", self._desired)
         self._mode = Mode.FAULT
+        self._notify()
         self._desired = None
         await self._motor.set_speed_percent(0)

@@ -4,6 +4,7 @@ Typing the path parameter as `Action` gets validation for free: an unknown
 action is a 422 rather than a silently ignored request.
 """
 
+import logging
 import secrets
 from typing import Annotated
 
@@ -17,9 +18,14 @@ from verbot.controller import Controller
 from verbot.hardware.protocols import SpeechEngine, SystemPower
 from verbot.web import render_index
 
+log = logging.getLogger(__name__)
+
 
 class SayRequest(BaseModel):
     text: str = Field(min_length=1, max_length=500)
+    # Off by default so a bare /say stays a pure speaker test: bring-up step 6
+    # needs audio without moving a mechanism that may not be attached yet.
+    animate: bool = False
 
     @field_validator("text")
     @classmethod
@@ -151,9 +157,35 @@ def create_app(
         return controller.status
 
     @app.post("/say", tags=["speech"], status_code=status.HTTP_202_ACCEPTED)
-    async def say(body: SayRequest, speech: SpeechDep) -> dict[str, str]:
+    async def say(
+        body: SayRequest, controller: ControllerDep, speech: SpeechDep
+    ) -> dict[str, str | bool]:
+        """Speak `text`, optionally animating the mouth while it plays.
+
+        With `animate`, the talk gear has to be engaged *before* the phrase
+        starts or the mouth and the audio will not line up, so this waits for
+        the interrogation to reach ACTING. Talk has no limit switch — per
+        docs/hardware.md the gear set runs until the motor reverses — so the
+        drum is parked at the stop cam once the phrase ends.
+
+        A mouth that never engages is logged and then ignored: the audio is the
+        point, and refusing to speak because the gearbox is absent would make
+        the speaker untestable on the bench.
+        """
+        animated = False
+        if body.animate:
+            await controller.request_action(Action.TALK)
+            animated = await controller.wait_until_acting(
+                Action.TALK, timeout=settings.interrogation_timeout_s + 1.0
+            )
+            if not animated:
+                log.warning("talk gear never engaged; speaking with a still mouth")
+
         await speech.say(body.text)
-        return {"spoken": body.text}
+
+        if animated:
+            await controller.request_action(Action.STOP)
+        return {"spoken": body.text, "animated": animated}
 
     if settings.shutdown_token is not None:
         expected = settings.shutdown_token.encode()
