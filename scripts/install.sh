@@ -157,6 +157,16 @@ apply_firmware_config() {
     return 0
   fi
 
+  # The marker only catches our own previous runs. A copy appended by hand
+  # while following step 3 of docs/deployment.md carries no marker, and
+  # appending over it loads pwm-2chan and max98357a twice.
+  if grep -qF "dtoverlay=pwm-2chan" "$BOOT_CONFIG"; then
+    warn "$BOOT_CONFIG already sets dtoverlay=pwm-2chan outside our markers."
+    warn "Appending would load the overlays twice, so this step is skipped."
+    warn "Delete the existing copy by hand and re-run to have it managed here."
+    return 0
+  fi
+
   local backup="${BOOT_CONFIG}.verbot-backup"
   [ -f "$backup" ] || sudo cp "$BOOT_CONFIG" "$backup"
   info "Backup at $backup"
@@ -169,6 +179,27 @@ apply_firmware_config() {
 
   info "Overlays appended. They load on the next boot."
   NEEDS_REBOOT=1
+}
+
+enable_i2c_dev() {
+  say "Enabling the i2c-dev module"
+  # dtparam=i2c_arm=on brings up the bus (/sys/bus/i2c/devices/i2c-1) but not
+  # the /dev/i2c-* character devices that smbus2 opens. Those come from the
+  # i2c-dev module, which nothing loads by default -- raspi-config's "enable
+  # I2C" does both halves, and the dtparam alone is only the first.
+  if lsmod | grep -q '^i2c_dev'; then
+    info "Already loaded"
+  else
+    sudo modprobe i2c-dev
+    info "Loaded i2c-dev"
+  fi
+
+  if [ -f /etc/modules ] && grep -qxF "i2c-dev" /etc/modules; then
+    info "Already in /etc/modules"
+  else
+    echo "i2c-dev" | sudo tee -a /etc/modules >/dev/null
+    info "Added to /etc/modules so it survives a reboot"
+  fi
 }
 
 write_env() {
@@ -251,6 +282,7 @@ main() {
   sync_deps
   add_groups
   apply_firmware_config
+  enable_i2c_dev
   write_env
   install_service
   summary

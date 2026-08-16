@@ -157,15 +157,37 @@ if you would rather work through it by hand.
 Append the contents of [`../config/config.txt.example`](../config/config.txt.example)
 to `/boot/firmware/config.txt` and reboot. Then verify:
 
+`dtparam=i2c_arm=on` brings up the bus but does **not** create the `/dev/i2c-*`
+character devices that `smbus2` opens. Those need the `i2c-dev` module, which
+nothing loads by default — `raspi-config`'s "enable I2C" does both halves, and
+the dtparam is only the first:
+
+```bash
+sudo modprobe i2c-dev
+echo i2c-dev | sudo tee -a /etc/modules   # survive a reboot
+```
+
+Then verify:
+
 ```bash
 ls /sys/class/pwm/          # expect pwmchip0
 cat /sys/class/pwm/pwmchip0/npwm   # expect 2 — pwm-2chan gives both channels
 aplay -l                    # expect the MAX98357A card
+ls /dev/i2c-*               # expect /dev/i2c-1
 i2cdetect -y 1              # expect a device at 0x20
 ```
 
 If `pwmchip0` is absent or numbered differently, set `VERBOT_PWM_CHIP`
 accordingly — kernel PWM chip numbering has shifted between OS releases.
+
+If `/sys/bus/i2c/devices/` lists `i2c-1` but `/dev/i2c-1` is missing, the bus is
+enabled and only `i2c-dev` is absent. A missing MCP23017 is not the cause: the
+bus node exists whether or not anything is wired to it, and shows up as an empty
+`i2cdetect` grid rather than a missing device file.
+
+**Append the block once.** If you have already appended it by hand, the install
+script will detect the existing `dtoverlay=pwm-2chan` and skip rather than add a
+second copy — duplicated `dtoverlay` lines load the overlays twice.
 
 If `npwm` reads 1, the single-channel `pwm` overlay is still in place. The
 DRV8833 needs `pwm-2chan`: it has no PHASE/ENABLE mode, so both IN1 and IN2
