@@ -57,6 +57,29 @@ preflight() {
   sudo -v || die "sudo authentication failed."
 }
 
+wait_for_dns() {
+  say "Waiting for name resolution"
+  # network-config sets optional: true on wlan0 so a missing access point
+  # cannot block boot. The cost is that an early SSH can beat NetworkManager
+  # to configuring DNS, and the first real fetch then dies on an unresolved
+  # host. Wait it out rather than failing halfway through the install.
+  local deadline=$(( SECONDS + 90 )) host
+  for host in astral.sh github.com; do
+    until getent hosts "$host" >/dev/null 2>&1; do
+      if [ "$SECONDS" -ge "$deadline" ]; then
+        warn "Cannot resolve $host."
+        warn "Check:  ip route show default"
+        warn "        cat /etc/resolv.conf"
+        warn "        systemctl is-active NetworkManager"
+        die "No DNS after 90s."
+      fi
+      info "No DNS yet, retrying: $host"
+      sleep 5
+    done
+    info "Resolved $host"
+  done
+}
+
 install_packages() {
   say "Installing system packages"
   sudo apt-get update -qq
@@ -215,6 +238,7 @@ EOF
 
 main() {
   preflight
+  wait_for_dns
   install_packages
   install_uv
   fetch_source
