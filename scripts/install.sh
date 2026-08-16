@@ -83,7 +83,13 @@ wait_for_dns() {
 install_packages() {
   say "Installing system packages"
   sudo apt-get update -qq
-  sudo apt-get install -y --no-install-recommends espeak-ng i2c-tools git
+  # espeak-ng, i2c-tools and git are runtime needs. The rest are build deps
+  # for lgpio: it publishes aarch64 wheels only up to cp312, and this image
+  # runs CPython 3.13, so uv falls back to the sdist and compiles it here.
+  # That sdist runs lgpio.i through swig and links against system liblgpio.
+  sudo apt-get install -y --no-install-recommends \
+    espeak-ng i2c-tools git \
+    build-essential python3-dev swig liblgpio-dev
 }
 
 install_uv() {

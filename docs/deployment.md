@@ -176,8 +176,15 @@ need a PWM channel.
 ```bash
 sudo apt update
 sudo apt install -y espeak-ng i2c-tools
+sudo apt install -y build-essential python3-dev swig liblgpio-dev
 espeak-ng "hello"      # confirm audio reaches the speaker
 ```
+
+The second line is the build toolchain for `lgpio`. It publishes aarch64 wheels
+only up to **cp312**, and this image runs CPython 3.13, so there is no wheel to
+match and `uv` compiles the sdist here. `uv.lock` records only the sdist for the
+same reason, so this is not something a lockfile refresh avoids. Without these
+packages the sync fails at `error: command 'swig' failed`.
 
 ## 5. Install
 
