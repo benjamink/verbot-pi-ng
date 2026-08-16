@@ -50,6 +50,8 @@ class Settings(BaseSettings):
 
     # Speech
     speech_enabled: bool = True
+    # Spoken once the server is wired up and serving. Empty string to stay silent.
+    startup_announcement: str = "I am Verbot! How may I help you?"
     espeak_voice: str = "en-gb"
     espeak_pitch: int = 10
     espeak_speed: int = 130

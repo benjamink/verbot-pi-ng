@@ -1,5 +1,6 @@
 """Entrypoint. Wires hardware, controller, API and mDNS together."""
 
+import asyncio
 import contextlib
 import logging
 
@@ -13,6 +14,21 @@ from verbot.discovery import ServiceAdvertiser
 from verbot.hardware.protocols import LedPattern
 from verbot.main_support import build_hardware, build_keypad, build_power
 from verbot.speech import EspeakEngine
+
+log = logging.getLogger(__name__)
+
+
+async def announce(speech: EspeakEngine, text: str) -> None:
+    """Speak the readiness greeting.
+
+    Runs detached from startup: the phrase takes a couple of seconds, and the
+    API and front panel should not wait on the sound card to become useful.
+    A failure here is cosmetic, so it is logged rather than propagated.
+    """
+    try:
+        await speech.say(text)
+    except Exception:
+        log.exception("startup announcement failed")
 
 
 def build_app(settings: Settings) -> FastAPI:
@@ -34,10 +50,19 @@ def build_app(settings: Settings) -> FastAPI:
         if led is not None:
             await led.set_pattern(LedPattern.SOLID)
         await advertiser.start()
+        # Last, so "ready" means the controller, panel and mDNS are all up.
+        announcement: asyncio.Task[None] | None = None
+        if settings.startup_announcement:
+            announcement = asyncio.create_task(announce(speech, settings.startup_announcement))
+        app.state.announcement = announcement
         try:
             yield
         finally:
             # Order matters: stop advertising, then guarantee the motor is off.
+            if announcement is not None:
+                announcement.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await announcement
             await advertiser.close()
             if led is not None:
                 await led.set_pattern(LedPattern.OFF)
