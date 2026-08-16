@@ -27,6 +27,10 @@ entirely commented out and therefore do nothing.
 hostname: verbot
 manage_etc_hosts: true
 
+bootcmd:
+  - [ systemctl, disable, userconfig.service ]
+  - [ systemctl, enable, getty@tty1.service ]
+
 users:
   - name: bkrein
     shell: /bin/bash
@@ -38,10 +42,10 @@ users:
       - "ssh-ed25519 AAAA... you@workstation"
 
 ssh_pwauth: false
-timezone: US/Eastern
+timezone: America/New_York
 
 runcmd:
-  - systemctl enable --now ssh
+  - [ systemctl, enable, --now, ssh ]
 ```
 
 `network-config`:
@@ -59,9 +63,39 @@ network:
       regulatory-domain: US
 ```
 
-Then **bump `instance_id` in `meta-data`**. cloud-init compares it against a
-cached copy and skips provisioning entirely when it matches, so a card that has
-booted once ignores your edits until that string changes.
+Then in `meta-data`, set **`instance-id`** — with a hyphen — to a new value:
+
+```yaml
+dsmode: local
+instance-id: verbot-2026-08-16-02
+```
+
+This is the single most important line, and the stock template gets it wrong.
+It ships `instance_id` with an **underscore**, which is not a cloud-init key at
+all. cloud-init reads `instance-id` (see `iid_key` in `DataSourceNoCloud.py`),
+so with the underscore spelling the id silently stays at its NoCloud default of
+`nocloud` forever. Every `once-per-instance` module — `users_groups`,
+`set_passwords`, `ssh` — then runs on the very first boot and is skipped on
+every boot after, no matter how many times you edit `user-data`.
+
+The failure is deeply misleading, because `update_hostname` runs
+`once-per-always`. Your new hostname appears, which looks like the config was
+applied, while no user was ever created. If `/etc/hostname` is right but
+`/etc/passwd` has only pi-gen's `pi` placeholder, this is why.
+
+The `bootcmd` block retires the first-boot wizard. `userconfig.service` is
+enabled and prompts for a username on **every** boot until something calls
+`cancel-rename`, which nothing does on a declaratively provisioned image.
+`bootcmd` runs in the init stage, well before `multi-user.target`, so it cannot
+race the wizard. Re-enabling `getty@tty1` is not optional: the image ships it
+disabled because the wizard owns the console, so disabling the wizard alone
+leaves no console login at all.
+
+Use canonical timezone names. Debian 13 moved legacy names like `US/Eastern`
+into the separate `tzdata-legacy` package, which a Lite image does not carry —
+`cc_timezone` raises `IOError` and the module fails. `America/New_York` works.
+Note that `timedatectl` on an Arch workstation happily reports the legacy name,
+so copying it across is an easy mistake.
 
 Keep the group list to groups that exist on a stock image. `gpio` and `i2c` are
 added in step 6 — naming a nonexistent group makes `useradd` fail and takes the
@@ -78,10 +112,18 @@ half of the pipeline broke:
 
 - **`custom.toml` still present** — you are on the cloud-init variant and it was
   never read. The standard variant *deletes* the file after applying it.
-- **cloud-init ran but did nothing** — `instance_id` was unchanged, or the YAML
-  has a tab in it. Check `/var/log/cloud-init.log` on `rootfs`.
+- **`/etc/hostname` correct but no user in `/etc/passwd`** — `instance-id` was
+  unchanged, so the per-instance modules were skipped. Confirm with
+  `ls /var/lib/cloud/instances/`: a directory named `nocloud` rather than your
+  id means the key never took effect.
+- **A module failed** — `grep -E "WARNING|Traceback" /var/log/cloud-init.log` on
+  `rootfs`. The log is `root:0640`, so it needs sudo to read.
 - **The Pi has no network but is otherwise configured** — the Zero 2 W radio is
   2.4 GHz only. Confirm the SSID exists on 2.4 GHz with WPA2.
+
+Timestamps in that log are unreliable. The Zero 2 W has no RTC, so `fake-hwclock`
+restores the image build date and every entry looks months old. Judge ordering by
+sequence, never by clock time.
 
 The pre-Bookworm `ssh` and `wpa_supplicant.conf` files work on neither variant.
 Trixie uses NetworkManager, and `wpa_supplicant.conf` in the boot partition is
