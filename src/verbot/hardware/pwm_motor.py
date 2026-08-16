@@ -20,6 +20,7 @@ this reason.
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,12 @@ DEFAULT_SYSFS_ROOT = Path("/sys/class/pwm")
 # How long to wait for the kernel to create the channel directory after export.
 EXPORT_POLL_INTERVAL_S = 0.01
 EXPORT_POLL_ATTEMPTS = 50
+
+# How long to wait for udev to hand the exported channel to the gpio group.
+# Longer than the export wait: udev runs a shell helper (99-com.rules) rather
+# than just materialising a directory, and it is competing with everything else
+# starting at boot.
+ACCESS_POLL_ATTEMPTS = 200
 
 # nSLEEP is active low: high wakes the driver, low tri-states the outputs.
 AWAKE = 1
@@ -83,16 +90,35 @@ class KernelPwmMotor:
 
     async def _export(self, channel: int) -> None:
         path = self._path(channel)
-        if path.exists():
-            return
+        if not path.exists():
+            self._write(self._chip / "export", str(channel))
+            # The kernel creates the channel directory asynchronously.
+            for _ in range(EXPORT_POLL_ATTEMPTS):
+                if path.exists():
+                    break
+                await asyncio.sleep(EXPORT_POLL_INTERVAL_S)
+            else:
+                raise RuntimeError(f"PWM channel {path} did not appear after export")
 
-        self._write(self._chip / "export", str(channel))
-        # The kernel creates the channel directory asynchronously.
-        for _ in range(EXPORT_POLL_ATTEMPTS):
-            if path.exists():
+        await self._await_writable(path / "duty_cycle")
+
+    async def _await_writable(self, path: Path) -> None:
+        """Wait for udev to hand the freshly exported channel to the gpio group.
+
+        The kernel creates pwmN root-owned; 99-com.rules then runs `chgrp -R
+        gpio` over the pwm subsystem asynchronously. Existence therefore does
+        not imply writability, and the first start after a boot loses that race
+        and dies with EACCES on duty_cycle. Restart=on-failure papers over it a
+        few seconds later, which makes the fault look intermittent.
+        """
+        for _ in range(ACCESS_POLL_ATTEMPTS):
+            if os.access(path, os.W_OK):
                 return
             await asyncio.sleep(EXPORT_POLL_INTERVAL_S)
-        raise RuntimeError(f"PWM channel {path} did not appear after export")
+        raise RuntimeError(
+            f"{path} never became writable. Is this user in the gpio group, and does "
+            "99-com.rules chgrp the pwm subsystem?"
+        )
 
     def _claim_pins(self) -> "_LgpioPins":
         import lgpio

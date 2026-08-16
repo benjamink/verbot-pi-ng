@@ -1,6 +1,9 @@
+import asyncio
+
 import pytest
 
 from verbot.config import Settings
+from verbot.hardware import pwm_motor
 from verbot.hardware.pwm_motor import KernelPwmMotor
 
 CHANNEL_NAMES = ("pwm0", "pwm1")
@@ -202,4 +205,55 @@ async def test_open_fails_loudly_if_a_channel_never_appears(tmp_path, gpio):
 
     motor = KernelPwmMotor(Settings(), sysfs_root=tmp_path, gpio=gpio)
     with pytest.raises(RuntimeError, match="did not appear"):
+        await motor.open()
+
+
+def _unwritable_sysfs(tmp_path):
+    """A chip whose channels exist but are still root-owned, as right after export."""
+    chip = tmp_path / "pwmchip0"
+    chip.mkdir()
+    (chip / "export").write_text("")
+    (chip / "unexport").write_text("")
+    for name in CHANNEL_NAMES:
+        channel = chip / name
+        channel.mkdir()
+        for filename in CHANNEL_FILES:
+            path = channel / filename
+            path.write_text("0")
+            path.chmod(0o444)
+    return chip
+
+
+async def test_open_waits_for_udev_to_grant_group_access(tmp_path, gpio):
+    """The kernel creates the channel; udev chgrps it to gpio a moment later.
+
+    99-com.rules runs `chgrp -R gpio` on the pwm subsystem asynchronously, so a
+    channel directory can exist while its files are still root-only. Writing
+    immediately loses that race and fails with EACCES on the first start after
+    boot, which Restart=on-failure then papers over.
+    """
+    chip = _unwritable_sysfs(tmp_path)
+
+    async def udev_grants_access():
+        await asyncio.sleep(0.05)
+        for name in CHANNEL_NAMES:
+            for filename in CHANNEL_FILES:
+                (chip / name / filename).chmod(0o644)
+
+    motor = KernelPwmMotor(Settings(), sysfs_root=tmp_path, gpio=gpio)
+    granter = asyncio.create_task(udev_grants_access())
+    await motor.open()
+    await granter
+
+    assert (chip / "pwm0" / "enable").read_text() == "1"
+    assert (chip / "pwm1" / "enable").read_text() == "1"
+
+
+async def test_open_reports_a_permission_problem_instead_of_hanging(tmp_path, gpio, monkeypatch):
+    """If access never arrives, say why rather than surfacing a bare EACCES."""
+    monkeypatch.setattr(pwm_motor, "ACCESS_POLL_ATTEMPTS", 3)
+    _unwritable_sysfs(tmp_path)
+    motor = KernelPwmMotor(Settings(), sysfs_root=tmp_path, gpio=gpio)
+
+    with pytest.raises(RuntimeError, match="gpio"):
         await motor.open()
