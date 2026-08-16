@@ -34,7 +34,7 @@ bootcmd:
 users:
   - name: bkrein
     shell: /bin/bash
-    groups: [adm, sudo, users, dialout, audio, video, plugdev, netdev]
+    groups: [adm, sudo, users, dialout, audio, video, plugdev, netdev, gpio, i2c]
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     lock_passwd: false
     passwd: "$6$..."          # openssl passwd -6 'yourpassword'
@@ -97,9 +97,16 @@ into the separate `tzdata-legacy` package, which a Lite image does not carry —
 Note that `timedatectl` on an Arch workstation happily reports the legacy name,
 so copying it across is an easy mistake.
 
-Keep the group list to groups that exist on a stock image. `gpio` and `i2c` are
-added in step 6 — naming a nonexistent group makes `useradd` fail and takes the
-whole user creation down with it, landing you back at the wizard.
+**List `gpio` and `i2c` here, not only in step 6.** `cc_users_groups` re-applies
+this list verbatim every time `instance-id` changes, so any group added later
+with `usermod` is silently removed on the next re-provision. That drops write
+access to `/sys/class/pwm` (`root:gpio`, mode 770) and the service dies at
+startup with `PermissionError: … '/sys/class/pwm/pwmchip0/export'`, which looks
+nothing like a user-management problem.
+
+Both groups exist on a stock Raspberry Pi OS image. Do not add speculative
+groups — a name that does not exist makes `useradd` fail and takes the whole
+user creation down with it, landing you back at the wizard.
 
 `optional: true` keeps a missing access point from blocking boot. The robot is
 built to run its panel buttons with no network (bring-up checklist step 7), so a
