@@ -6,6 +6,10 @@ from a Raspberry Pi Zero 2 W, over an HTTP API, with speech output.
 The original 1980s electronics are removed; the motor, gearbox, interrogation
 switch bank and front keypad are all retained and driven directly from the Pi.
 
+New here? [**Theory of operation**](docs/theory-of-operation.md) explains how
+the gearbox works, what replaced the original electronics, how the software
+drives it, and the API.
+
 ## Status
 
 **Software complete and tested off-Pi; not yet run on the robot.**
