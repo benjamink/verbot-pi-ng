@@ -129,6 +129,29 @@ The pre-Bookworm `ssh` and `wpa_supplicant.conf` files work on neither variant.
 Trixie uses NetworkManager, and `wpa_supplicant.conf` in the boot partition is
 ignored outright.
 
+## Fast path: the install script
+
+Steps 3–8 are automated. Once you can SSH in:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/benjamink/verbot-pi-ng/main/scripts/install.sh | bash
+```
+
+It is idempotent — re-run it after a push to update the checkout and
+dependencies. It refuses to run on anything that is not a 64-bit Raspberry Pi,
+backs up `config.txt` to `config.txt.verbot-backup` before appending, and marks
+its additions with `# >>> verbot-pi-ng >>>` so a second run is a no-op.
+
+The service is enabled, so it starts on boot and the panel buttons are live.
+**Put the robot on a stand with its wheels off the ground before rebooting.**
+
+The script enables the service but does not start it before the reboot: the PWM
+overlay is not loaded until then, so starting early would fail on a missing
+`pwmchip0` and trip `Restart=on-failure`.
+
+The rest of this document explains what the script does, and is what to follow
+if you would rather work through it by hand.
+
 ## 3. Firmware config
 
 Append the contents of [`../config/config.txt.example`](../config/config.txt.example)
