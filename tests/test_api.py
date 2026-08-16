@@ -313,3 +313,23 @@ async def test_say_with_animate_still_speaks_when_the_mouth_never_engages(impati
     assert response.json() == {"spoken": "hello", "animated": False}
     assert speech.spoken == ["hello"]
     assert controller.status.mode is Mode.FAULT
+
+
+async def test_page_has_no_shutdown_control_when_the_route_is_absent(client_rig):
+    """No token configured means no /system/shutdown route, so no dead button."""
+    client, *_ = client_rig
+    body = (await client.get("/")).text
+    assert 'id="shutdown"' not in body
+
+
+async def test_page_offers_shutdown_when_configured(secure_rig):
+    client, *_ = secure_rig
+    body = (await client.get("/")).text
+    assert 'id="shutdown"' in body
+
+
+async def test_page_never_embeds_the_shutdown_token(secure_rig):
+    """The page is unauthenticated; serving the token would defeat the guard."""
+    client, *_ = secure_rig
+    body = (await client.get("/")).text
+    assert "correct-horse-battery-staple" not in body

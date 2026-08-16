@@ -206,7 +206,7 @@ Interactive docs are served at `/docs`, and a control page for bring-up at `/`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/` | Web control page: buttons, status, speak box, speed sliders, log |
+| `GET` | `/` | Web control page: buttons, status, speak box, speed sliders, log, and shutdown when configured |
 | `GET` | `/healthz` | Liveness. `{"status": "ok"}` |
 | `GET` | `/status` | Current `mode`, `current_action`, `desired_action` |
 | `POST` | `/actions/{action}` | Interrogate for `action`, then perform it |
@@ -247,6 +247,13 @@ deployment has no such route at all, rather than a route that always refuses. It
 requires the token in an `X-Verbot-Token` header, halts the motor before the
 machine goes, and returns `202` from a background task so the response outlives
 the poweroff.
+
+The web page grows a **Shut down the Pi** control when the token is configured,
+and omits it entirely otherwise. The token is deliberately **not** served in the
+page: the page itself is unauthenticated, so embedding it would hand poweroff to
+anyone on the LAN and undo the reason the endpoint is guarded at all. Instead
+the browser asks once and keeps it in `localStorage`, and forgets it again on a
+401.
 
 ---
 

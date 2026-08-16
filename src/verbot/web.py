@@ -148,16 +148,69 @@ async function poll() {
 }
 loadSpeeds();
 poll();
-setInterval(poll, 1000);
+const pollTimer = setInterval(poll, 1000);
+
+// Present only when a shutdown token is configured, so the route exists.
+const shutdownButton = document.getElementById('shutdown');
+if (shutdownButton) {
+  const KEY = 'verbot-shutdown-token';
+  shutdownButton.onclick = async () => {
+    // The token is never served in this page - it lives only in this browser,
+    // so loading the page gives an unauthenticated visitor nothing.
+    let token = localStorage.getItem(KEY);
+    if (!token) {
+      token = prompt('Shutdown token (VERBOT_SHUTDOWN_TOKEN):');
+      if (!token) return;
+      localStorage.setItem(KEY, token);
+    }
+    if (!confirm('Power off the Pi?\\n\\nIt will need the physical button to come back.')) return;
+
+    let res;
+    try {
+      res = await fetch('/system/shutdown', {
+        method: 'POST', headers: { 'X-Verbot-Token': token },
+      });
+    } catch (e) {
+      note(`POST /system/shutdown -> ${e}`, true);
+      return;
+    }
+    note(`POST /system/shutdown -> ${res.status} ${await res.text()}`, !res.ok);
+    if (res.status === 401) {
+      localStorage.removeItem(KEY);
+      note('Token rejected and forgotten - you will be asked again.', true);
+    }
+    if (res.ok) {
+      // Stop polling: the machine is going, and the log would otherwise fill
+      // with connection failures.
+      clearInterval(pollTimer);
+      shutdownButton.disabled = true;
+      note('Shutting down.');
+    }
+  };
+}
 """
 
 
-def render_index(actions: Iterable[Action]) -> str:
+def render_index(actions: Iterable[Action], shutdown_enabled: bool = False) -> str:
     # Every action, stop included: the oversized red control is /halt, which is
     # a different operation from driving the drum round to the stop cam.
     buttons = "\n".join(
         f'      <button data-action="{a.value}">{a.value.replace("_", " ")}</button>'
         for a in actions
+    )
+    # Omitted entirely when no token is configured: the route does not exist
+    # then, so a button would only ever 404.
+    shutdown_section = (
+        """
+<section>
+  <h2>System</h2>
+  <button id="shutdown">Shut down the Pi</button>
+  <p class="hint">Asks for the shutdown token once and keeps it in this
+  browser. The token is never included in this page.</p>
+</section>
+"""
+        if shutdown_enabled
+        else ""
     )
     return f"""<!doctype html>
 <html lang="en">
@@ -219,6 +272,7 @@ def render_index(actions: Iterable[Action]) -> str:
   </label>
 </section>
 
+{shutdown_section}
 <section>
   <h2>Log</h2>
   <div id="log"></div>

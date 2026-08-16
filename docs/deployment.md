@@ -263,7 +263,10 @@ or add `Environment=` lines to the unit.
 There is a control page at **`http://verbot.local:8080/`** covering every step
 below except the panel buttons: action buttons, a large stop, live status, a
 speak box, live speed sliders, and a log of each request and response. It calls
-the same endpoints as the `curl` commands here, so either works.
+the same endpoints as the `curl` commands here, so either works. With
+`VERBOT_SHUTDOWN_TOKEN` set it also offers a shutdown control, which asks for
+the token once and keeps it in that browser rather than embedding it in the
+page.
 
 Work through these in order, with the robot **on a stand with its wheels off
 the ground** until step 5 passes. Keep the schematic open while you do —

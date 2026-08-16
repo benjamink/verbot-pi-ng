@@ -77,7 +77,7 @@ def create_app(
     app.state.controller = controller
     app.state.speech = speech
 
-    index_html = render_index(list(Action))
+    index_html = render_index(list(Action), shutdown_enabled=settings.shutdown_token is not None)
 
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
     async def index() -> HTMLResponse:
