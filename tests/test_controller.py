@@ -188,3 +188,31 @@ async def test_close_always_stops_the_motor(settings):
 
     assert motor.speed == 0
     assert motor.closed and switches.closed
+
+
+async def test_halt_stops_the_motor_without_moving_the_robot(rig):
+    """Used on the way to a system shutdown, so it must not interrogate."""
+    controller, motor, _ = rig
+    await controller.request_action(Action.FORWARDS)
+    assert motor.speed != 0
+
+    await controller.halt()
+
+    assert motor.speed == 0
+    assert controller.status.mode is Mode.IDLE
+    assert controller.status.desired_action is None
+
+
+async def test_halt_leaves_no_watchdog_running(rig):
+    """A timeout firing after halt would flip status to fault for no reason.
+
+    The rig's interrogation_timeout_s is 0.05, so waiting past it is enough to
+    catch a watchdog that halt failed to cancel.
+    """
+    controller, _, _ = rig
+    await controller.request_action(Action.TALK)
+
+    await controller.halt()
+    await asyncio.sleep(0.1)
+
+    assert controller.status.mode is Mode.IDLE

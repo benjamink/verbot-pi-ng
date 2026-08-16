@@ -44,6 +44,19 @@ class Controller:
         await self._motor.close()
         await self._switches.close()
 
+    async def halt(self) -> None:
+        """Cut the motor now, without running an action.
+
+        Deliberately not Action.STOP: that interrogates for the stop cam and
+        takes seconds of movement. This is for the moment before the machine
+        powers off, when the robot should simply stop. `_current` is left
+        alone - it still records the last cam the drum reached.
+        """
+        self._cancel_timeout()
+        self._mode = Mode.IDLE
+        self._desired = None
+        await self._motor.set_speed_percent(0)
+
     @property
     def status(self) -> ControllerStatus:
         return ControllerStatus(
