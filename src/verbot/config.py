@@ -67,5 +67,12 @@ class Settings(BaseSettings):
     # docs/deployment.md before turning it on.
     shutdown_token: str | None = None
 
+    @property
+    def shutdown_enabled(self) -> bool:
+        """A blank token is treated as unset, not as a credential an empty
+        header can satisfy. This is the one place that decides "on" so a
+        second, differently-worded check can't drift from it."""
+        return bool(self.shutdown_token and self.shutdown_token.strip())
+
     # Hardware toggle: False runs entirely on fakes (dev machines).
     use_real_hardware: bool = False

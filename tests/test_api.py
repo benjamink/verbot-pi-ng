@@ -132,6 +132,27 @@ async def test_shutdown_route_is_absent_without_a_token(client_rig):
     assert "/system/shutdown" not in schema["paths"]
 
 
+@pytest.mark.parametrize("blank_token", ["", "   "])
+async def test_shutdown_route_is_absent_with_a_blank_token(blank_token):
+    """An empty or whitespace token must be treated as unset, not as a real
+    credential that an empty header can satisfy."""
+    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
+    settings = Settings(shutdown_token=blank_token)
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+    power = FakePower()
+    app = create_app(controller=controller, speech=speech, settings=settings, power=power)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post("/system/shutdown", headers={"X-Verbot-Token": blank_token})
+        assert response.status_code == 404
+        assert power.shutdown_called is False
+
+        schema = (await client.get("/openapi.json")).json()
+        assert "/system/shutdown" not in schema["paths"]
+    await controller.close()
+
+
 async def test_shutdown_rejects_a_missing_token(secure_rig):
     client, power, _ = secure_rig
     response = await client.post("/system/shutdown")
@@ -333,3 +354,18 @@ async def test_page_never_embeds_the_shutdown_token(secure_rig):
     client, *_ = secure_rig
     body = (await client.get("/")).text
     assert "correct-horse-battery-staple" not in body
+
+
+@pytest.mark.parametrize("blank_token", ["", "   "])
+async def test_page_has_no_shutdown_control_with_a_blank_token(blank_token):
+    """A blank token must not leave a button pointed at a route that 404s."""
+    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
+    settings = Settings(shutdown_token=blank_token)
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+    app = create_app(controller=controller, speech=speech, settings=settings, power=FakePower())
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        body = (await client.get("/")).text
+        assert 'id="shutdown"' not in body
+    await controller.close()

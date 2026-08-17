@@ -77,7 +77,7 @@ def create_app(
     app.state.controller = controller
     app.state.speech = speech
 
-    index_html = render_index(list(Action), shutdown_enabled=settings.shutdown_token is not None)
+    index_html = render_index(list(Action), shutdown_enabled=settings.shutdown_enabled)
 
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
     async def index() -> HTMLResponse:
@@ -187,7 +187,13 @@ def create_app(
             await controller.request_action(Action.STOP)
         return {"spoken": body.text, "animated": animated}
 
-    if settings.shutdown_token is not None:
+    if settings.shutdown_token is not None and not settings.shutdown_enabled:
+        # Blank rather than unset: most likely a `.env` line with nothing
+        # after the `=`. Say so, since the alternative is an operator who
+        # believes the endpoint is armed when it is silently absent.
+        log.warning("shutdown_token is set but blank; /system/shutdown will not be registered")
+
+    if settings.shutdown_enabled:
         expected = settings.shutdown_token.encode()
 
         @app.post("/system/shutdown", tags=["system"], status_code=status.HTTP_202_ACCEPTED)
