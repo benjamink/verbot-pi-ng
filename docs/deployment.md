@@ -274,11 +274,14 @@ openssl rand -hex 32
 VERBOT_SHUTDOWN_TOKEN=<the generated value>
 ```
 
+The file now holds a credential, so restrict it: `chmod 600 .env`.
+
 A blank token — `VERBOT_SHUTDOWN_TOKEN=` with nothing after the `=` — is
 treated the same as no token at all: the route is never registered, and the
 server logs a warning at startup rather than the endpoint returning 401
-forever. If you set the variable and still get a 404, that is deliberate, not
-a bug.
+forever. If you set the variable, restarted the service (below), and still
+get a 404, that is deliberate, not a bug — a 404 before the restart just
+means the running process has not read the new `.env` yet.
 
 The token must be ASCII. `openssl rand -hex 32` always produces one; a
 hand-picked token with an accented or non-Latin character will never
@@ -296,11 +299,13 @@ command -v poweroff
 ```
 
 ```bash
-sudo tee /etc/sudoers.d/verbot-poweroff <<'EOF'
+sudo visudo -f /etc/sudoers.d/verbot-poweroff
+```
+
+Add one line, then save:
+
+```
 verbot ALL=(root) NOPASSWD: /usr/sbin/poweroff
-EOF
-sudo chmod 0440 /etc/sudoers.d/verbot-poweroff
-sudo visudo -c
 ```
 
 Replace `verbot` with the user the service runs as, and the path with whatever
@@ -308,7 +313,35 @@ Replace `verbot` with the user the service runs as, and the path with whatever
 `NOPASSWD: ALL`. A wrong path fails closed, which at least is the safe
 direction.
 
-Then:
+`visudo -f` validates before it writes the file and refuses to save something
+broken, and it sets the `0440` mode itself — unlike `tee` followed by `chmod`
+and a separate `visudo -c`, which installs the file before checking it.
+Root has no password on Raspberry Pi OS and sudo refuses to run at all while
+anything in `sudoers.d` is unparseable, so a mistake caught only after
+installing means physical access or pulling the SD card to fix it. Keep a
+second root shell open (`sudo -i` in another terminal) while you edit, as the
+standard precaution, in case something elsewhere in `sudoers.d` is already
+broken.
+
+Restart the service so it picks up both the token and the grant — the route
+is registered once at startup, so editing `.env` alone does nothing until the
+process restarts:
+
+```bash
+sudo systemctl restart verbot@$USER
+```
+
+Confirm the grant works without powering anything off:
+
+```bash
+sudo -n -l /usr/sbin/poweroff
+```
+
+That lists the command with no password prompt. If it prompts for one or
+refuses, fix the grant before going further — the endpoint will fail the same
+way.
+
+Then, **this actually shuts the Pi down**:
 
 ```bash
 curl -X POST localhost:8080/system/shutdown -H 'X-Verbot-Token: <token>'
@@ -317,6 +350,12 @@ curl -X POST localhost:8080/system/shutdown -H 'X-Verbot-Token: <token>'
 ```json
 {"status": "shutting down"}
 ```
+
+The 202 is not proof it worked — it is returned before the poweroff is even
+attempted, so a wrong sudoers grant looks identical to success: same
+response, machine stays up. Confirm the Pi actually went down. If it did not,
+`journalctl -u verbot@$USER` will have the `poweroff exited …` line logged by
+`system_power.py`, with sudo's own diagnostic attached.
 
 Polkit is not an alternative here: a systemd service has no seat or login
 session, so the usual "a local user may power off without sudo" path does not
