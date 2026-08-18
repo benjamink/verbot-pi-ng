@@ -258,6 +258,77 @@ journalctl -u verbot@$USER -f
 Put `VERBOT_USE_REAL_HARDWARE=true` in a `.env` file in the working directory,
 or add `Environment=` lines to the unit.
 
+## 9. Shutdown endpoint (optional)
+
+Without the OnOff SHIM there is no power button, and pulling USB power without
+a clean shutdown risks corrupting the SD card. This endpoint gives you a
+shutdown over HTTP. It is off unless you configure a token.
+
+Generate one and put it in the working directory's `.env`:
+
+```bash
+openssl rand -hex 32
+```
+
+```
+VERBOT_SHUTDOWN_TOKEN=<the generated value>
+```
+
+A blank token — `VERBOT_SHUTDOWN_TOKEN=` with nothing after the `=` — is
+treated the same as no token at all: the route is never registered, and the
+server logs a warning at startup rather than the endpoint returning 401
+forever. If you set the variable and still get a 404, that is deliberate, not
+a bug.
+
+The token must be ASCII. `openssl rand -hex 32` always produces one; a
+hand-picked token with an accented or non-Latin character will never
+authenticate, because ASGI decodes incoming header bytes as latin-1 while the
+comparison encodes as UTF-8, mangling anything outside ASCII in the round
+trip. It fails closed — 401, not a crash — but silently, so there is nothing
+in the response to tell you why. Stick to what `openssl rand -hex 32` gives
+you and this does not come up.
+
+The service runs unprivileged, so `poweroff` needs one narrow grant. Check the
+real path first — it is `/usr/sbin` on Trixie and `/sbin` on older images:
+
+```bash
+command -v poweroff
+```
+
+```bash
+sudo tee /etc/sudoers.d/verbot-poweroff <<'EOF'
+verbot ALL=(root) NOPASSWD: /usr/sbin/poweroff
+EOF
+sudo chmod 0440 /etc/sudoers.d/verbot-poweroff
+sudo visudo -c
+```
+
+Replace `verbot` with the user the service runs as, and the path with whatever
+`command -v poweroff` reported. Scope it to that one binary — never
+`NOPASSWD: ALL`. A wrong path fails closed, which at least is the safe
+direction.
+
+Then:
+
+```bash
+curl -X POST localhost:8080/system/shutdown -H 'X-Verbot-Token: <token>'
+```
+
+```json
+{"status": "shutting down"}
+```
+
+Polkit is not an alternative here: a systemd service has no seat or login
+session, so the usual "a local user may power off without sudo" path does not
+apply.
+
+**Two things worth knowing.** The token travels as a plaintext header over
+unencrypted HTTP — acceptable on a home LAN, worth thinking about before
+exposing the robot more widely. And the rest of the API has no authentication
+at all while advertising itself over mDNS, so anything on the network can
+already drive the robot; this endpoint is guarded separately because powering
+the machine off is a different proposition from waving its arms.
+
 ## Bring-up checklist
 
 There is a control page at **`http://verbot.local:8080/`** covering every step

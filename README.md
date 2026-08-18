@@ -30,6 +30,8 @@ for the task breakdown and deferred phase 2 work.
 - **Front-panel keypad** — the original eight buttons drive the robot directly,
   with no network required
 - **Status LED** in the original panel position
+- **Optional shutdown endpoint** — power the Pi down over HTTP, guarded by a
+  token and off by default
 - **Zeroconf/mDNS** service advertisement for discovery
 - **Runs its full test suite off-Pi** — hardware sits behind protocols with
   in-memory fakes
