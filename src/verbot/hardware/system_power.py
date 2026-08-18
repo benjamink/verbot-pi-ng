@@ -21,15 +21,20 @@ class SubprocessPower:
             proc = await asyncio.create_subprocess_exec(
                 *POWEROFF_COMMAND,
                 stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
         except FileNotFoundError:
             log.error("sudo not found - cannot power off")
             return
 
-        returncode = await proc.wait()
-        if returncode != 0:
+        # sudo's stderr is the one diagnostic that distinguishes "user not in
+        # sudoers" from "a password is required" - the two failure states
+        # named above. It is one short line, so capturing it is not a
+        # log-spam risk.
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
             log.error(
-                "poweroff exited %d - check the sudoers grant in docs/deployment.md",
-                returncode,
+                "poweroff exited %d - check the sudoers grant in docs/deployment.md: %s",
+                proc.returncode,
+                stderr.decode(errors="replace").strip(),
             )

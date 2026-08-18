@@ -52,9 +52,19 @@ class Controller:
 
         Deliberately not Action.STOP: that interrogates for the stop cam and
         takes seconds of movement. This is for the moment before the machine
-        powers off, when the robot should simply stop. `_current` is left
-        alone - it still records the last cam the drum reached.
+        powers off, when the robot should simply stop.
+
+        `_current` is accurate only while ACTING: the drum is stationary at
+        the cam it names, and only the gear set was running, so it is left
+        alone. While INTERROGATING the drum is mid-sweep and `_current` still
+        names the *previous* cam, not the one under the switch now - halting
+        there leaves the drum between cams, so `_current` is cleared to the
+        same "position unknown" state it carries at boot. Getting this wrong
+        makes request_action() believe a later STOP is already satisfied and
+        skip it entirely.
         """
+        if self._mode is Mode.INTERROGATING:
+            self._current = None
         self._cancel_timeout()
         self._mode = Mode.IDLE
         self._notify()

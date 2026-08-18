@@ -201,6 +201,57 @@ async def test_halt_stops_the_motor_without_moving_the_robot(rig):
     assert motor.speed == 0
     assert controller.status.mode is Mode.IDLE
     assert controller.status.desired_action is None
+    assert controller.status.current_action is None
+
+
+async def test_halt_during_interrogation_clears_current_action(rig):
+    """Halting mid-INTERROGATING catches the drum between cams: `_current`
+    would otherwise still name the *previous* action's cam, which is not
+    where the drum is. Clearing it restores the "position unknown" state
+    `_current is None` already carries at boot."""
+    controller, motor, switches = rig
+    await controller.request_action(Action.FORWARDS)
+    await switches.sweep_to(Action.FORWARDS)
+    assert controller.status.current_action is Action.FORWARDS
+
+    await controller.request_action(Action.TALK)
+    assert controller.status.mode is Mode.INTERROGATING
+
+    await controller.halt()
+
+    assert controller.status.current_action is None
+
+
+async def test_halt_during_acting_keeps_current_action(rig):
+    """Halting mid-ACTING is the case the old docstring described correctly:
+    the drum is stationary at the cam `_current` already names, only the
+    gear set was running, so it stays accurate and must be kept."""
+    controller, motor, switches = rig
+    await controller.request_action(Action.FORWARDS)
+    await switches.sweep_to(Action.FORWARDS)
+    assert controller.status.mode is Mode.ACTING
+
+    await controller.halt()
+
+    assert controller.status.current_action is Action.FORWARDS
+
+
+async def test_stop_after_a_mid_interrogation_halt_actually_moves_the_drum(rig):
+    """Regression for the request_action() invariant that skips a STOP only
+    when the drum is known to be parked there. Before the fix, halting
+    mid-interrogation left a stale `current_action`, and the /stop that
+    followed believed the drum was already at the stop cam and did nothing.
+    """
+    controller, motor, switches = rig
+    await controller.request_action(Action.FORWARDS)
+    await switches.sweep_to(Action.FORWARDS)
+    await controller.request_action(Action.TALK)  # drum leaves the stop cam
+    await controller.halt()
+
+    await controller.request_action(Action.STOP)
+
+    assert controller.status.mode is Mode.INTERROGATING
+    assert motor.speed == 50
 
 
 async def test_halt_leaves_no_watchdog_running(rig):

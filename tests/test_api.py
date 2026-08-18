@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -165,6 +166,51 @@ async def test_shutdown_rejects_a_wrong_token(secure_rig):
     response = await client.post("/system/shutdown", headers={"X-Verbot-Token": "wrong"})
     assert response.status_code == 401
     assert power.shutdown_called is False
+
+
+async def test_shutdown_rejection_is_logged_without_the_token(secure_rig, caplog):
+    """A failed attempt is the one thing on an open LAN worth seeing in
+    journalctl, but the token itself must never end up in the log."""
+    client, power, _ = secure_rig
+    with caplog.at_level(logging.WARNING, logger="verbot.api"):
+        response = await client.post(
+            "/system/shutdown", headers={"X-Verbot-Token": "totally-wrong-token"}
+        )
+    assert response.status_code == 401
+    assert "rejected" in caplog.text.lower() or "shutdown" in caplog.text.lower()
+    assert "totally-wrong-token" not in caplog.text
+
+
+async def test_shutdown_accepts_a_token_padded_with_whitespace(secure_rig):
+    """Real ASGI servers strip optional whitespace from header values per RFC
+    7230; the test transport does not. Stripping both sides here keeps the
+    two in agreement instead of only working under one of them."""
+    client, power, _ = secure_rig
+    response = await client.post(
+        "/system/shutdown", headers={"X-Verbot-Token": "  correct-horse-battery-staple  "}
+    )
+    assert response.status_code == 202
+    assert power.shutdown_called is True
+
+
+async def test_shutdown_accepts_an_unpadded_token_against_a_padded_configured_one():
+    """`shutdown_enabled` decides on the stripped token; the comparison must
+    use the same stripped value or a padded-in-.env token becomes
+    unauthenticatable."""
+    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
+    settings = Settings(shutdown_token="  correct-horse-battery-staple  ")
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+    power = FakePower()
+    app = create_app(controller=controller, speech=speech, settings=settings, power=power)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/system/shutdown", headers={"X-Verbot-Token": "correct-horse-battery-staple"}
+        )
+        assert response.status_code == 202
+        assert power.shutdown_called is True
+    await controller.close()
 
 
 async def test_shutdown_accepts_the_correct_token_and_stops_the_motor(secure_rig):

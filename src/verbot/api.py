@@ -194,7 +194,12 @@ def create_app(
         log.warning("shutdown_token is set but blank; /system/shutdown will not be registered")
 
     if settings.shutdown_enabled:
-        expected = settings.shutdown_token.encode()
+        # Stripped the same way shutdown_enabled decided "on", so a token
+        # with incidental whitespace in .env compares equal to itself. Real
+        # ASGI servers also strip optional whitespace from header values per
+        # RFC 7230, so stripping the incoming side too keeps the comparison
+        # consistent with what production actually receives.
+        expected = settings.shutdown_token.strip().encode()
 
         @app.post("/system/shutdown", tags=["system"], status_code=status.HTTP_202_ACCEPTED)
         async def shutdown(
@@ -207,9 +212,11 @@ def create_app(
             Registered only when a token is set, so the default deployment has
             no such route at all rather than a route that always refuses.
             """
-            if x_verbot_token is None or not secrets.compare_digest(
-                x_verbot_token.encode(), expected
-            ):
+            provided = x_verbot_token.strip().encode() if x_verbot_token is not None else None
+            if provided is None or not secrets.compare_digest(provided, expected):
+                # Worth seeing in journalctl on an open LAN - never the token
+                # itself, which would defeat the point of logging this.
+                log.warning("rejected shutdown attempt: invalid or missing token")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="invalid or missing shutdown token",
