@@ -54,16 +54,18 @@ class Controller:
         takes seconds of movement. This is for the moment before the machine
         powers off, when the robot should simply stop.
 
-        `_current` is accurate only while ACTING: the drum is stationary at
-        the cam it names, and only the gear set was running, so it is left
-        alone. While INTERROGATING the drum is mid-sweep and `_current` still
-        names the *previous* cam, not the one under the switch now - halting
-        there leaves the drum between cams, so `_current` is cleared to the
-        same "position unknown" state it carries at boot. Getting this wrong
-        makes request_action() believe a later STOP is already satisfied and
-        skip it entirely.
+        `_current` is trustworthy only when the drum is stationary at a known
+        cam: true in ACTING (the drum is parked at the cam it names; only the
+        gear set was running) and in IDLE (parked, having arrived via a
+        switch event), so it is left alone in both. Whenever the drum was
+        moving - INTERROGATING mid-sweep, or FAULT, which is only ever
+        entered from the watchdog firing during INTERROGATING - `_current`
+        still names the *previous* cam, not wherever the drum stopped, so it
+        is cleared to the same "position unknown" state it carries at boot.
+        Getting this wrong makes request_action() believe a later STOP is
+        already satisfied and skip it entirely.
         """
-        if self._mode is Mode.INTERROGATING:
+        if self._mode not in (Mode.ACTING, Mode.IDLE):
             self._current = None
         self._cancel_timeout()
         self._mode = Mode.IDLE

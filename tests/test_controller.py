@@ -254,6 +254,44 @@ async def test_stop_after_a_mid_interrogation_halt_actually_moves_the_drum(rig):
     assert motor.speed == 50
 
 
+async def test_halt_during_fault_clears_current_action(rig):
+    """FAULT is only ever entered from the watchdog firing mid-INTERROGATING,
+    so it leaves the drum exactly as mid-sweep as INTERROGATING itself: the
+    same "position unknown" state applies, and `_current` must be cleared."""
+    controller, motor, switches = rig
+    await controller.request_action(Action.FORWARDS)
+    await switches.sweep_to(Action.FORWARDS)
+    assert controller.status.current_action is Action.FORWARDS
+
+    await controller.request_action(Action.TALK)
+    await asyncio.sleep(0.1)  # settings.interrogation_timeout_s is 0.05
+    assert controller.status.mode is Mode.FAULT
+
+    await controller.halt()
+
+    assert controller.status.current_action is None
+
+
+async def test_stop_after_a_mid_fault_halt_actually_moves_the_drum(rig):
+    """Same regression as the mid-interrogation case, reached via the
+    watchdog instead. Parked at STOP, then interrogating elsewhere times out:
+    `_current` still says STOP even though the drum left that cam. An
+    operator hitting the emergency STOP after the fault must not have it
+    silently skipped because `_current` lies about where the drum sits."""
+    controller, motor, switches = rig
+    await controller.request_action(Action.STOP)
+    await switches.sweep_to(Action.STOP)
+    await controller.request_action(Action.TALK)  # drum leaves the stop cam
+    await asyncio.sleep(0.1)  # settings.interrogation_timeout_s is 0.05
+    assert controller.status.mode is Mode.FAULT
+    await controller.halt()
+
+    await controller.request_action(Action.STOP)
+
+    assert controller.status.mode is Mode.INTERROGATING
+    assert motor.speed == 50
+
+
 async def test_halt_leaves_no_watchdog_running(rig):
     """A timeout firing after halt would flip status to fault for no reason.
 
