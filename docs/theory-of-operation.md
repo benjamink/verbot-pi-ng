@@ -73,7 +73,7 @@ switch bank and front keypad are retained and driven directly from the Pi.
 | **Pimoroni OnOff SHIM** | Power button, clean shutdown | Owns BCM 4, 17, 27 |
 | USB power bank | 5 V supply | The original 3 V and 6 V battery rails are gone |
 
-Three deliberate choices are worth knowing, because they constrain everything
+Four deliberate choices are worth knowing, because they constrain everything
 else:
 
 **Motor PWM is kernel-managed, not pigpio.** The DRV8833 has no PHASE/ENABLE
@@ -83,6 +83,11 @@ the other sits low — meaning both inputs need their own PWM channel
 for DMA timing, and the I2S DAC needs PCM too. Kernel PWM has no such conflict,
 so this robot gets both hardware PWM *and* audio. The original project had to
 give up hardware PWM for exactly this reason.
+
+**The Pi supplies signals, not motor power.** `IN1`/`IN2` are high-impedance
+inputs drawing microamps; the motor current comes from the DRV8833's own `VCC`
+feed and never touches a GPIO. See
+[Powering the motor](hardware.md#powering-the-motor).
 
 **The eight interrogation switches are direct GPIO inputs**, edge-triggered via
 `lgpio` with internal pull-ups. They are not on the expander — latency matters

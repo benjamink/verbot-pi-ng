@@ -82,6 +82,9 @@ board:
 - Both rails were switched by the board behind the front keypad panel, which
   also fed the red power LED in the panel's bottom-right corner.
 
+Where the motor's supply comes from now, and why it is not the Pi, is in
+[Powering the motor](#powering-the-motor).
+
 > ⚠️ The eight front-panel keypad buttons share that board with the power
 > switching. Before wiring them to the MCP23017, trace whether they are
 > independent switches to a common rail or a matrix, and decide what takes over
@@ -177,6 +180,46 @@ PMIC and cannot supply a stalled motor.
 
 There is no MODE pin. Unlike the DRV8835 this part has no PHASE/ENABLE mode,
 which is why direction costs a second PWM channel rather than one GPIO.
+
+### Powering the motor
+
+**The Pi does not power the motor.** Two separate paths run through the carrier,
+and confusing them is the usual source of "a GPIO can't supply that much
+current":
+
+- **Signal path** — `IN1`, `IN2` and `EEP` are high-impedance CMOS inputs
+  drawing microamps. The Pi only says *which switches to close*. A GPIO sources
+  around 16 mA, and the whole header perhaps 50 mA — orders of magnitude short
+  of motor current, and it never has to supply it.
+- **Power path** — motor current flows from `VCC`, through the H-bridge
+  MOSFETs, out `OUT1`/`OUT2`, through the motor and back to `GND`. It never
+  touches a GPIO.
+
+That is why `VCC` is not a logic rail, and why the common ground still matters:
+almost no current flows on that wire, but without a shared reference the carrier
+cannot interpret the Pi's logic levels at all.
+
+**Feed `VCC` from the power bank directly, not from the Pi's 5V header pin.**
+The header pin is the USB input rail passed straight through, so it does work
+electrically. But the motor then shares a supply with the Pi, and a stall or a
+direction reversal can drag that rail down far enough to drop the Wi-Fi or reset
+the board — and if the OnOff SHIM is inline, the motor current runs through the
+SHIM as well. A 3V motor from 2× 'C' cells can pull on the order of an amp
+stalled, which is not something to route through header pins.
+
+Fit **100–470 µF** of electrolytic bulk capacitance across `VCC`/`GND` close to
+the carrier. A direction reversal switches the full motor current in one step,
+and without local storage that transient is taken straight out of the shared
+supply.
+
+| Pin | Feed from | Why |
+|-----|-----------|-----|
+| `VCC` | Power bank 5V | Not the Pi's 3V3 — that rail is off the PMIC and cannot supply a stalled motor |
+| `GND` | Common with the Pi | Shared reference for the logic; carries no significant current |
+
+Because `VCC` is 5V and the motor is a 3V part, cap `VERBOT_ACTION_SPEED` rather
+than running ±100 — the PWM duty cycle is what keeps the average voltage near
+the motor's rating.
 
 ### Notable changes from the original project
 
