@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # the board's J1 jumper is bridged, which ties nSLEEP high in hardware.
     motor_sleep_pin: int | None = 6
     motor_fault_pin: int | None = 16
-    interrogation_speed: int = 50
+    interrogation_speed: int = 90
     action_speed: int = -100
 
     # Interrogation switch bank

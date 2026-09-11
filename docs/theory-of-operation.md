@@ -271,7 +271,7 @@ Every setting is an environment variable prefixed `VERBOT_`, readable from a
 |----------|---------|--------|
 | `VERBOT_USE_REAL_HARDWARE` | `false` | **`true` on the robot.** False runs entirely on fakes and nothing moves. |
 | `VERBOT_KEYPAD_ENABLED` | `true` | `false` skips the MCP23017 entirely — useful before it is wired |
-| `VERBOT_INTERROGATION_SPEED` | `50` | Drum speed. Slower gives more reliable switch detection. |
+| `VERBOT_INTERROGATION_SPEED` | `90` | Drum speed. Slower gives more reliable switch detection. |
 | `VERBOT_ACTION_SPEED` | `-100` | Negative by convention. Cap it if `VCC` is 5 V — the motor is a 3 V part. |
 | `VERBOT_INTERROGATION_TIMEOUT_S` | `10.0` | Watchdog. Roughly double a full drum revolution. |
 | `VERBOT_STARTUP_ANNOUNCEMENT` | `"I am Verbot! …"` | Spoken once ready. Empty to stay silent. |

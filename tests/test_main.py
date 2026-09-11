@@ -53,7 +53,7 @@ async def test_lifespan_stops_the_motor_on_shutdown():
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             await client.post("/actions/forwards")
-        assert motor.speed == 50
+        assert motor.speed == 90
 
     assert motor.speed == 0
     assert motor.closed
