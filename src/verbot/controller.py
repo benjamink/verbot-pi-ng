@@ -10,7 +10,7 @@ reverse. See docs/hardware.md.
 import asyncio
 import logging
 
-from verbot.actions import Action, ControllerStatus, Mode
+from verbot.actions import ACTIONS_WITH_LIMIT_SWITCH, Action, ControllerStatus, Mode
 from verbot.config import Settings
 from verbot.hardware.protocols import MotorDriver, SwitchBank
 
@@ -134,14 +134,24 @@ class Controller:
 
         * INTERROGATING + closed + it is the one we want -> gears are in
           position, start the action.
-        * ACTING + opened + it is the action we are running -> a mechanical
+        * ACTING + opened + it is the action we are running + that action has
+          a mechanical limit switch (see ACTIONS_WITH_LIMIT_SWITCH) -> the
           limit switch broke the circuit, so the action is finished.
 
-        Everything else is the drum sweeping past, and is ignored.
+        Everything else is the drum sweeping past, or a switch release from an
+        action with no limit switch (its drum switch stays engaged for as
+        long as the drum is clutched there, so a release is noise, not
+        completion - e.g. TALK, which must keep running for as long as the
+        caller wants the mouth moving), and is ignored.
         """
         if self._mode is Mode.INTERROGATING and activated and action is self._desired:
             await self._enter_action(action)
-        elif self._mode is Mode.ACTING and not activated and action is self._current:
+        elif (
+            self._mode is Mode.ACTING
+            and not activated
+            and action is self._current
+            and action in ACTIONS_WITH_LIMIT_SWITCH
+        ):
             log.info("limit switch reached for %s", action)
             await self.request_action(Action.STOP)
 

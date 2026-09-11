@@ -18,6 +18,14 @@ class Action(StrEnum):
     TALK = "talk"
 
 
+# Per docs/hardware.md: only the arm actions have a mechanical limit switch
+# wired in series with their drum switch, which breaks the circuit when the
+# arm reaches its travel limit. Every other action's drum switch stays
+# engaged for as long as the drum is clutched there, so a release seen while
+# ACTING is either noise or a genuine ambiguity, not a "done" signal.
+ACTIONS_WITH_LIMIT_SWITCH: frozenset[Action] = frozenset({Action.PUT_DOWN, Action.PICK_UP})
+
+
 class Mode(StrEnum):
     """What the controller is currently doing."""
 
