@@ -45,7 +45,7 @@ async def test_request_begins_interrogation(rig):
     await controller.request_action(Action.FORWARDS)
     assert controller.status.mode is Mode.INTERROGATING
     assert controller.status.desired_action is Action.FORWARDS
-    assert motor.speed == 90
+    assert motor.speed == 85
 
 
 async def test_reaching_target_switch_reverses_motor(rig):
@@ -70,7 +70,7 @@ async def test_intermediate_switches_do_not_trigger_the_action(rig):
         assert controller.status.mode is Mode.INTERROGATING, f"{action} broke interrogation"
         await switches.release(action)
 
-    assert motor.speed == 90
+    assert motor.speed == 85
 
 
 async def test_stop_halts_the_motor_at_the_stop_position(rig):
@@ -102,7 +102,7 @@ async def test_switching_actions_re_enters_interrogation(rig):
 
     await controller.request_action(Action.TALK)
     assert controller.status.mode is Mode.INTERROGATING
-    assert motor.speed == 90
+    assert motor.speed == 85
 
     await switches.release(Action.FORWARDS)
     await switches.activate(Action.TALK)
@@ -122,7 +122,7 @@ async def test_limit_switch_stops_a_running_action(rig):
 
     assert controller.status.mode is Mode.INTERROGATING
     assert controller.status.desired_action is Action.STOP
-    assert motor.speed == 90
+    assert motor.speed == 85
 
     await switches.activate(Action.STOP)
     assert controller.status.mode is Mode.IDLE
@@ -144,7 +144,7 @@ async def test_interrogation_timeout_stops_the_motor(rig):
     """A dirty switch that never closes must not leave the motor running."""
     controller, motor, _ = rig
     await controller.request_action(Action.TALK)
-    assert motor.speed == 90
+    assert motor.speed == 85
 
     await asyncio.sleep(0.1)  # settings.interrogation_timeout_s is 0.05
 
@@ -182,7 +182,7 @@ async def test_close_always_stops_the_motor(settings):
     controller = Controller(motor=motor, switches=switches, settings=settings)
     await controller.start()
     await controller.request_action(Action.FORWARDS)
-    assert motor.speed == 90
+    assert motor.speed == 85
 
     await controller.close()
 
@@ -251,7 +251,7 @@ async def test_stop_after_a_mid_interrogation_halt_actually_moves_the_drum(rig):
     await controller.request_action(Action.STOP)
 
     assert controller.status.mode is Mode.INTERROGATING
-    assert motor.speed == 90
+    assert motor.speed == 85
 
 
 async def test_halt_during_fault_clears_current_action(rig):
@@ -289,7 +289,7 @@ async def test_stop_after_a_mid_fault_halt_actually_moves_the_drum(rig):
     await controller.request_action(Action.STOP)
 
     assert controller.status.mode is Mode.INTERROGATING
-    assert motor.speed == 90
+    assert motor.speed == 85
 
 
 async def test_halt_leaves_no_watchdog_running(rig):

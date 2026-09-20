@@ -97,7 +97,7 @@ async def test_posting_an_action_starts_interrogation(client_rig):
     assert response.status_code == 202
     assert response.json()["desired_action"] == "forwards"
     assert controller.status.mode is Mode.INTERROGATING
-    assert motor.speed == 90
+    assert motor.speed == 85
 
 
 async def test_status_follows_the_state_machine(client_rig):

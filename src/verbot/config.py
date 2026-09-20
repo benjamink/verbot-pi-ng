@@ -38,7 +38,10 @@ class Settings(BaseSettings):
     # the board's J1 jumper is bridged, which ties nSLEEP high in hardware.
     motor_sleep_pin: int | None = 6
     motor_fault_pin: int | None = 16
-    interrogation_speed: int = 90
+    # 90 turned the drum reliably but overshot narrow cams before the motor
+    # finished reversing, landing one switch further round than requested.
+    # 85 was the first value that stopped that on the reference unit.
+    interrogation_speed: int = 85
     action_speed: int = -100
 
     # Interrogation switch bank

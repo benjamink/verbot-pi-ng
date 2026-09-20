@@ -404,7 +404,7 @@ The defaults are inherited guesses. Replace them with measurements:
 
 | Setting | Default | How to determine |
 |---------|---------|------------------|
-| `VERBOT_INTERROGATION_SPEED` | 90 | Lowest speed that still turns the drum reliably. Slower gives more reliable switch detection. |
+| `VERBOT_INTERROGATION_SPEED` | 85 | Bracketed from both sides: too slow and the drum stalls; too fast and it overshoots a switch before the motor finishes reversing, landing on the next one round instead. Find the lowest value that turns reliably, then back off further if actions land on the wrong switch. |
 | `VERBOT_INTERROGATION_TIMEOUT_S` | 10.0 | Time a full drum revolution takes, roughly doubled. |
 | `VERBOT_ACTION_SPEED` | -100 | Reduce if the mechanism sounds strained. Also cap it if the DRV8833's `VCC` is fed from 5V: the motor is a 3V part, so ±60 is roughly its rated voltage. |
 | `VERBOT_MOTOR_SLEEP_PIN` | 6 | Set to `null` if the carrier's `J1` jumper is bridged — nSLEEP is then tied high in hardware and BCM 6 stays free. |
