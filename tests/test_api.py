@@ -5,10 +5,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from verbot.actions import Action, Mode
-from verbot.api import create_app
+from verbot.api import BLINK_WORD, MORSE_CODE, create_app
 from verbot.config import Settings
 from verbot.controller import Controller
-from verbot.hardware.fakes import FakeMotor, FakePower, FakeSpeech, FakeSwitchBank
+from verbot.hardware.fakes import FakeMotor, FakePower, FakeReadySignal, FakeSpeech, FakeSwitchBank
 
 
 @pytest.fixture
@@ -36,6 +36,27 @@ async def secure_rig():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client, power, motor
+    await controller.close()
+
+
+@pytest.fixture
+async def blink_rig():
+    """An app with a ready pin configured, so /system/blink-led exists."""
+    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
+    settings = Settings()
+    controller = Controller(motor=motor, switches=switches, settings=settings)
+    await controller.start()
+    ready_signal = FakeReadySignal()
+    app = create_app(
+        controller=controller,
+        speech=speech,
+        settings=settings,
+        power=FakePower(),
+        ready_signal=ready_signal,
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client, ready_signal
     await controller.close()
 
 
@@ -122,6 +143,45 @@ async def test_say_rejects_empty_text(client_rig):
     response = await client.post("/say", json={"text": "   "})
     assert response.status_code == 422
     assert speech.spoken == []
+
+
+async def test_blink_led_route_is_absent_without_a_ready_pin(client_rig):
+    """Not 403 - absent. The capability should not even be advertised."""
+    client, *_ = client_rig
+    assert (await client.post("/system/blink-led")).status_code == 404
+
+    schema = (await client.get("/openapi.json")).json()
+    assert "/system/blink-led" not in schema["paths"]
+
+
+def test_morse_table_matches_standard_verbot_encoding():
+    assert MORSE_CODE == {
+        "V": "...-",
+        "E": ".",
+        "R": ".-.",
+        "B": "-...",
+        "O": "---",
+        "T": "-",
+    }
+
+
+def _expected_morse_history(word: str) -> list[bool]:
+    history = []
+    for letter in word:
+        for _symbol in MORSE_CODE[letter]:
+            history += [True, False]
+    history.append(True)  # ends lit, matching the steady "ready" state
+    return history
+
+
+async def test_blink_led_spells_the_word_in_morse(blink_rig, monkeypatch):
+    monkeypatch.setattr("verbot.api.MORSE_UNIT_S", 0)
+    client, ready_signal = blink_rig
+
+    response = await client.post("/system/blink-led")
+
+    assert response.status_code == 202
+    assert ready_signal.history == _expected_morse_history(BLINK_WORD)
 
 
 async def test_shutdown_route_is_absent_without_a_token(client_rig):
@@ -380,6 +440,19 @@ async def test_say_with_animate_still_speaks_when_the_mouth_never_engages(impati
     assert response.json() == {"spoken": "hello", "animated": False}
     assert speech.spoken == ["hello"]
     assert controller.status.mode is Mode.FAULT
+
+
+async def test_page_has_no_blink_control_when_the_route_is_absent(client_rig):
+    """No ready pin configured means no /system/blink-led route, so no dead button."""
+    client, *_ = client_rig
+    body = (await client.get("/")).text
+    assert 'id="blink-led"' not in body
+
+
+async def test_page_offers_blink_when_configured(blink_rig):
+    client, *_ = blink_rig
+    body = (await client.get("/")).text
+    assert 'id="blink-led"' in body
 
 
 async def test_page_has_no_shutdown_control_when_the_route_is_absent(client_rig):

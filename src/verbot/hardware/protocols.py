@@ -60,6 +60,17 @@ class StatusLed(Protocol):
     async def close(self) -> None: ...
 
 
+class ReadySignal(Protocol):
+    """External GPIO signal that the service has finished starting.
+
+    Lets hardware outside the robot (a supervisory MCU, a panel LED, ...)
+    watch a pin instead of polling the API.
+    """
+
+    async def set_ready(self, ready: bool) -> None: ...
+    async def close(self) -> None: ...
+
+
 class SpeechEngine(Protocol):
     async def say(self, text: str) -> None: ...
     async def close(self) -> None: ...

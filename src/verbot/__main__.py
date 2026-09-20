@@ -12,7 +12,7 @@ from verbot.config import Settings
 from verbot.controller import Controller
 from verbot.discovery import ServiceAdvertiser
 from verbot.hardware.protocols import LedPattern
-from verbot.main_support import build_hardware, build_keypad, build_power
+from verbot.main_support import build_hardware, build_keypad, build_power, build_ready_signal
 from verbot.speech import EspeakEngine
 
 log = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ def build_app(settings: Settings) -> FastAPI:
     controller = Controller(motor=motor, switches=switches, settings=settings)
     keypad, led = build_keypad(settings)
     power = build_power(settings)
+    ready_signal = build_ready_signal(settings)
     speech = EspeakEngine(settings)
     advertiser = ServiceAdvertiser(settings)
 
@@ -51,6 +52,8 @@ def build_app(settings: Settings) -> FastAPI:
             await led.set_pattern(LedPattern.SOLID)
         await advertiser.start()
         # Last, so "ready" means the controller, panel and mDNS are all up.
+        if ready_signal is not None:
+            await ready_signal.set_ready(True)
         announcement: asyncio.Task[None] | None = None
         if settings.startup_announcement:
             announcement = asyncio.create_task(announce(speech, settings.startup_announcement))
@@ -58,6 +61,10 @@ def build_app(settings: Settings) -> FastAPI:
         try:
             yield
         finally:
+            # First, so nothing watching the pin thinks the robot still works
+            # while the rest of shutdown is still in flight.
+            if ready_signal is not None:
+                await ready_signal.close()
             # Order matters: stop advertising, then guarantee the motor is off.
             if announcement is not None:
                 announcement.cancel()
@@ -72,7 +79,13 @@ def build_app(settings: Settings) -> FastAPI:
             await controller.close()
             await speech.close()
 
-    app = create_app(controller=controller, speech=speech, settings=settings, power=power)
+    app = create_app(
+        controller=controller,
+        speech=speech,
+        settings=settings,
+        power=power,
+        ready_signal=ready_signal,
+    )
     app.router.lifespan_context = lifespan
     # Expose the composed hardware for introspection and tests.
     app.state.motor = motor
@@ -80,6 +93,7 @@ def build_app(settings: Settings) -> FastAPI:
     app.state.keypad = keypad
     app.state.led = led
     app.state.power = power
+    app.state.ready_signal = ready_signal
     return app
 
 

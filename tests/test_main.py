@@ -5,9 +5,16 @@ from httpx import ASGITransport, AsyncClient
 from verbot.__main__ import build_app
 from verbot.actions import Action, Mode
 from verbot.config import Settings
-from verbot.hardware.fakes import FakeKeypad, FakeLed, FakeMotor, FakePower, FakeSwitchBank
+from verbot.hardware.fakes import (
+    FakeKeypad,
+    FakeLed,
+    FakeMotor,
+    FakePower,
+    FakeReadySignal,
+    FakeSwitchBank,
+)
 from verbot.hardware.protocols import LedPattern
-from verbot.main_support import build_hardware, build_keypad, build_power
+from verbot.main_support import build_hardware, build_keypad, build_power, build_ready_signal
 
 
 def test_build_hardware_returns_fakes_when_hardware_disabled():
@@ -70,6 +77,24 @@ async def test_fake_power_records_the_request_instead_of_acting():
     assert power.shutdown_called is False
     await power.shutdown()
     assert power.shutdown_called is True
+
+
+def test_build_ready_signal_returns_a_fake_when_hardware_disabled():
+    assert isinstance(build_ready_signal(Settings(use_real_hardware=False)), FakeReadySignal)
+
+
+def test_build_ready_signal_returns_none_when_no_pin_is_configured():
+    assert build_ready_signal(Settings(ready_pin=None)) is None
+
+
+async def test_lifespan_raises_the_ready_pin_once_everything_is_wired_up():
+    app = build_app(Settings())
+
+    async with app.router.lifespan_context(app):
+        assert app.state.ready_signal.ready is True
+
+    assert app.state.ready_signal.ready is False
+    assert app.state.ready_signal.closed is True
 
 
 async def test_lifespan_announces_readiness():

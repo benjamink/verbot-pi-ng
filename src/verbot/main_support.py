@@ -3,7 +3,14 @@
 import logging
 
 from verbot.config import Settings
-from verbot.hardware.protocols import Keypad, MotorDriver, StatusLed, SwitchBank, SystemPower
+from verbot.hardware.protocols import (
+    Keypad,
+    MotorDriver,
+    ReadySignal,
+    StatusLed,
+    SwitchBank,
+    SystemPower,
+)
 
 log = logging.getLogger(__name__)
 
@@ -55,3 +62,18 @@ def build_power(settings: Settings) -> SystemPower:
     from verbot.hardware.system_power import SubprocessPower
 
     return SubprocessPower()
+
+
+def build_ready_signal(settings: Settings) -> ReadySignal | None:
+    """Return the readiness-pin adapter, or None if no pin is configured."""
+    if settings.ready_pin is None:
+        return None
+
+    if not settings.use_real_hardware:
+        from verbot.hardware.fakes import FakeReadySignal
+
+        return FakeReadySignal()
+
+    from verbot.hardware.ready_pin import LgpioReadySignal
+
+    return LgpioReadySignal(settings)

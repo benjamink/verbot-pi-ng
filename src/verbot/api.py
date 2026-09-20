@@ -4,6 +4,7 @@ Typing the path parameter as `Action` gets validation for free: an unknown
 action is a 422 rather than a silently ignored request.
 """
 
+import asyncio
 import logging
 import secrets
 from typing import Annotated
@@ -15,7 +16,7 @@ from pydantic import BaseModel, Field, field_validator
 from verbot.actions import Action, ControllerStatus
 from verbot.config import Settings
 from verbot.controller import Controller
-from verbot.hardware.protocols import SpeechEngine, SystemPower
+from verbot.hardware.protocols import ReadySignal, SpeechEngine, SystemPower
 from verbot.web import render_index
 
 log = logging.getLogger(__name__)
@@ -51,6 +52,41 @@ class SpeedsPatch(BaseModel):
     action_speed: int | None = Field(default=None, ge=-100, le=100)
 
 
+# International Morse, restricted to the letters BLINK_WORD actually uses.
+MORSE_CODE: dict[str, str] = {
+    "V": "...-",
+    "E": ".",
+    "R": ".-.",
+    "B": "-...",
+    "O": "---",
+    "T": "-",
+}
+BLINK_WORD = "VERBOT"
+
+# Dit length. Dah is 3x, the gap between symbols in a letter is 1x, and the
+# gap between letters is 3x - standard Morse timing (the PARIS ratios), just
+# slow enough to read by eye rather than by ear.
+MORSE_UNIT_S = 0.2
+
+
+async def blink_ready_signal(ready_signal: ReadySignal, word: str = BLINK_WORD) -> None:
+    """Blink `word` out in Morse code, ending lit to match the steady "ready" state.
+
+    Fire-and-forget from the route: the response should not block on the
+    several seconds this takes.
+    """
+    for letter in word:
+        symbols = MORSE_CODE[letter]
+        for index, symbol in enumerate(symbols):
+            await ready_signal.set_ready(True)
+            await asyncio.sleep(MORSE_UNIT_S if symbol == "." else 3 * MORSE_UNIT_S)
+            await ready_signal.set_ready(False)
+            if index < len(symbols) - 1:
+                await asyncio.sleep(MORSE_UNIT_S)  # gap between symbols
+        await asyncio.sleep(3 * MORSE_UNIT_S)  # gap between letters
+    await ready_signal.set_ready(True)
+
+
 def get_controller(request: Request) -> Controller:
     return request.app.state.controller
 
@@ -68,6 +104,7 @@ def create_app(
     speech: SpeechEngine,
     settings: Settings,
     power: SystemPower,
+    ready_signal: ReadySignal | None = None,
 ) -> FastAPI:
     app = FastAPI(
         title="Verbot",
@@ -77,7 +114,11 @@ def create_app(
     app.state.controller = controller
     app.state.speech = speech
 
-    index_html = render_index(list(Action), shutdown_enabled=settings.shutdown_enabled)
+    index_html = render_index(
+        list(Action),
+        shutdown_enabled=settings.shutdown_enabled,
+        blink_led_enabled=ready_signal is not None,
+    )
 
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
     async def index() -> HTMLResponse:
@@ -186,6 +227,15 @@ def create_app(
         if animated:
             await controller.request_action(Action.STOP)
         return {"spoken": body.text, "animated": animated}
+
+    if ready_signal is not None:
+        # Registered only when a ready pin is configured, same as /system/shutdown
+        # below - a route that can never do anything is worse than no route.
+        @app.post("/system/blink-led", tags=["system"], status_code=status.HTTP_202_ACCEPTED)
+        async def blink_led(background: BackgroundTasks) -> dict[str, str]:
+            """Blink "VERBOT" in Morse on the ready-pin LED, to spot this Pi among others."""
+            background.add_task(blink_ready_signal, ready_signal)
+            return {"status": "blinking"}
 
     if settings.shutdown_token is not None and not settings.shutdown_enabled:
         # Blank rather than unset: most likely a `.env` line with nothing

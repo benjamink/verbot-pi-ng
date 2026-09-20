@@ -150,6 +150,12 @@ loadSpeeds();
 poll();
 const pollTimer = setInterval(poll, 1000);
 
+// Present only when a ready pin is configured, so the route exists.
+const blinkButton = document.getElementById('blink-led');
+if (blinkButton) {
+  blinkButton.onclick = async () => { await call('POST', '/system/blink-led'); };
+}
+
 // Present only when a shutdown token is configured, so the route exists.
 const shutdownButton = document.getElementById('shutdown');
 if (shutdownButton) {
@@ -191,25 +197,40 @@ if (shutdownButton) {
 """
 
 
-def render_index(actions: Iterable[Action], shutdown_enabled: bool = False) -> str:
+def render_index(
+    actions: Iterable[Action], shutdown_enabled: bool = False, blink_led_enabled: bool = False
+) -> str:
     # Every action, stop included: the oversized red control is /halt, which is
     # a different operation from driving the drum round to the stop cam.
     buttons = "\n".join(
         f'      <button data-action="{a.value}">{a.value.replace("_", " ")}</button>'
         for a in actions
     )
-    # Omitted entirely when no token is configured: the route does not exist
-    # then, so a button would only ever 404.
-    shutdown_section = (
-        """
-<section>
-  <h2>System</h2>
-  <button id="shutdown">Shut down the Pi</button>
+    # Each button is omitted entirely when its route does not exist, so it
+    # would only ever 404 - same reasoning for both.
+    blink_button = (
+        """  <button id="blink-led">Blink "VERBOT" (Morse)</button>
+  <p class="hint">Blinks the word VERBOT in Morse code on the ready-pin LED -
+  useful for finding this Pi on a bench with more than one.</p>
+"""
+        if blink_led_enabled
+        else ""
+    )
+    shutdown_button = (
+        """  <button id="shutdown">Shut down the Pi</button>
   <p class="hint">Asks for the shutdown token once and keeps it in this
   browser. The token is never included in this page.</p>
-</section>
 """
         if shutdown_enabled
+        else ""
+    )
+    system_section = (
+        f"""
+<section>
+  <h2>System</h2>
+{blink_button}{shutdown_button}</section>
+"""
+        if blink_led_enabled or shutdown_enabled
         else ""
     )
     return f"""<!doctype html>
@@ -272,7 +293,7 @@ def render_index(actions: Iterable[Action], shutdown_enabled: bool = False) -> s
   </label>
 </section>
 
-{shutdown_section}
+{system_section}
 <section>
   <h2>Log</h2>
   <div id="log"></div>

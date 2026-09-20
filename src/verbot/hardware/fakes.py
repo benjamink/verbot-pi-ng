@@ -129,3 +129,18 @@ class FakePower:
 
     async def shutdown(self) -> None:
         self.shutdown_called = True
+
+
+class FakeReadySignal:
+    def __init__(self) -> None:
+        self.ready = False
+        self.history: list[bool] = []
+        self.closed = False
+
+    async def set_ready(self, ready: bool) -> None:
+        self.ready = ready
+        self.history.append(ready)
+
+    async def close(self) -> None:
+        self.ready = False
+        self.closed = True

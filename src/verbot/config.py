@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     keypad_poll_hz: float = 50.0
     keypad_debounce_samples: int = 2
 
+    # Readiness pin: driven high once the controller, front panel and mDNS
+    # advertiser are all up, and low again as soon as shutdown begins - so
+    # external hardware can watch this GPIO instead of polling the API. Set
+    # to None to disable.
+    ready_pin: int | None = 17
+
     # Shutdown endpoint. Unset means the route is never registered - see
     # docs/deployment.md before turning it on.
     shutdown_token: str | None = None

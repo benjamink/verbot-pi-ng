@@ -117,7 +117,7 @@ interrogation switches, inputs with pull-ups, active low.
 | 12  | 32       | DRV8833 | Motor `IN1` — kernel PWM0 |
 | 13  | 33       | DRV8833 | Motor `IN2` — kernel PWM1 |
 | 16  | 36       | DRV8833 | nFAULT (`ULT`) — active low, input with pull-up |
-| 17  | 11       | OnOff SHIM | Power button |
+| 17  | 11       | **Verbot** | Ready signal — high once the API is serving (output). Reassigned from the OnOff SHIM's power button; this board has no SHIM fitted. If one is added later, move this to a free pin instead. |
 | 18  | 12       | I2S DAC | BCLK |
 | 19  | 35       | I2S DAC | LRCLK |
 | 21  | 40       | I2S DAC | DIN |
