@@ -70,7 +70,7 @@ switch bank and front keypad are retained and driven directly from the Pi.
 | **DRV8833** carrier | Motor driver | Replaces the original polarity-reversing circuit |
 | **MAX98357A** | I2S DAC + amplifier | Speech output to a passive 4–8 Ω speaker |
 | **MCP23017** | I2C GPIO expander | The eight front-panel buttons and the status LED |
-| **Pimoroni OnOff SHIM** | Power button, clean shutdown | Owns BCM 4, 17, 27 |
+| **Pimoroni OnOff SHIM** | Power button, clean shutdown | Not fitted on this build; BCM 17 is reassigned to the ready-pin LED - see `hardware.md` |
 | USB power bank | 5 V supply | The original 3 V and 6 V battery rails are gone |
 
 Four deliberate choices are worth knowing, because they constrain everything
@@ -220,7 +220,7 @@ Interactive docs are served at `/docs`, and a control page for bring-up at `/`.
 | `POST` | `/say` | Speak text, optionally animating the mouth |
 | `GET` | `/speeds` | Current interrogation and action speeds |
 | `PATCH` | `/speeds` | Adjust either speed live (not persisted) |
-| `POST` | `/system/shutdown` | Power off. Registered **only** when a token is configured |
+| `POST` | `/system/shutdown` | Power off. Registered **only** when enabled |
 
 `{action}` is one of `stop`, `rotate_right`, `rotate_left`, `forwards`,
 `reverse`, `put_down`, `pick_up`, `talk`. It is typed as an enum, so an unknown
@@ -247,18 +247,18 @@ without knowing its address.
 
 ### Shutdown
 
-`/system/shutdown` exists only if `VERBOT_SHUTDOWN_TOKEN` is set — the default
-deployment has no such route at all, rather than a route that always refuses. It
-requires the token in an `X-Verbot-Token` header, halts the motor before the
-machine goes, and returns `202` from a background task so the response outlives
-the poweroff.
+`/system/shutdown` exists only if `VERBOT_SHUTDOWN_ENABLED=true` — the default
+deployment has no such route at all, rather than a route that always refuses.
+It is unauthenticated, same as the rest of the API: anything on the LAN that
+can already drive the robot can also power it off, which is the same trust
+boundary as everywhere else in this project. It halts the motor before the
+machine goes, and returns `202` from a background task so the response
+outlives the poweroff.
 
-The web page grows a **Shut down the Pi** control when the token is configured,
-and omits it entirely otherwise. The token is deliberately **not** served in the
-page: the page itself is unauthenticated, so embedding it would hand poweroff to
-anyone on the LAN and undo the reason the endpoint is guarded at all. Instead
-the browser asks once and keeps it in `localStorage`, and forgets it again on a
-401.
+The web page grows a **Shut down the Pi** control when the endpoint is
+enabled, and omits it entirely otherwise. Clicking it asks for confirmation in
+the browser (`confirm()`) before sending the request - a guard against a
+misclick, not against a hostile network.
 
 ---
 
@@ -275,7 +275,7 @@ Every setting is an environment variable prefixed `VERBOT_`, readable from a
 | `VERBOT_ACTION_SPEED` | `-100` | Negative by convention. Cap it if `VCC` is 5 V — the motor is a 3 V part. |
 | `VERBOT_INTERROGATION_TIMEOUT_S` | `10.0` | Watchdog. Roughly double a full drum revolution. |
 | `VERBOT_STARTUP_ANNOUNCEMENT` | `"I am Verbot! …"` | Spoken once ready. Empty to stay silent. |
-| `VERBOT_SHUTDOWN_TOKEN` | unset | Setting it registers `/system/shutdown` |
+| `VERBOT_SHUTDOWN_ENABLED` | `false` | `true` registers `/system/shutdown` |
 
 Speeds are signed: **positive is interrogation, negative is action.** If the
 motor turns the wrong way, swap `OUT1` and `OUT2` rather than the signs in the

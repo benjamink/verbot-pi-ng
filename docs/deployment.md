@@ -262,34 +262,24 @@ or add `Environment=` lines to the unit.
 
 Without the OnOff SHIM there is no power button, and pulling USB power without
 a clean shutdown risks corrupting the SD card. This endpoint gives you a
-shutdown over HTTP. It is off unless you configure a token.
+shutdown over HTTP. It is off unless you enable it.
 
-Generate one and put it in the working directory's `.env`:
-
-```bash
-openssl rand -hex 32
-```
+Put this in the working directory's `.env`:
 
 ```
-VERBOT_SHUTDOWN_TOKEN=<the generated value>
+VERBOT_SHUTDOWN_ENABLED=true
 ```
 
-The file now holds a credential, so restrict it: `chmod 600 .env`.
+It is unauthenticated, same as the rest of the API — anything on the LAN that
+can already drive the robot can power it off too. If that is not an
+acceptable trade-off on your network, leave this unset; the web page's
+**Shut down the Pi** button only asks for an in-browser confirmation, not a
+credential, so it is a guard against a misclick rather than against a hostile
+network.
 
-A blank token — `VERBOT_SHUTDOWN_TOKEN=` with nothing after the `=` — is
-treated the same as no token at all: the route is never registered, and the
-server logs a warning at startup rather than the endpoint returning 401
-forever. If you set the variable, restarted the service (below), and still
-get a 404, that is deliberate, not a bug — a 404 before the restart just
-means the running process has not read the new `.env` yet.
-
-The token must be ASCII. `openssl rand -hex 32` always produces one; a
-hand-picked token with an accented or non-Latin character will never
-authenticate, because ASGI decodes incoming header bytes as latin-1 while the
-comparison encodes as UTF-8, mangling anything outside ASCII in the round
-trip. It fails closed — 401, not a crash — but silently, so there is nothing
-in the response to tell you why. Stick to what `openssl rand -hex 32` gives
-you and this does not come up.
+If you set the variable, restarted the service (below), and still get a 404,
+that is deliberate, not a bug — a 404 before the restart just means the
+running process has not read the new `.env` yet.
 
 The service runs unprivileged, so `poweroff` needs one narrow grant. Check the
 real path first — it is `/usr/sbin` on Trixie and `/sbin` on older images:
@@ -323,7 +313,7 @@ second root shell open (`sudo -i` in another terminal) while you edit, as the
 standard precaution, in case something elsewhere in `sudoers.d` is already
 broken.
 
-Restart the service so it picks up both the token and the grant — the route
+Restart the service so it picks up both the setting and the grant — the route
 is registered once at startup, so editing `.env` alone does nothing until the
 process restarts:
 
@@ -344,7 +334,7 @@ way.
 Then, **this actually shuts the Pi down**:
 
 ```bash
-curl -X POST localhost:8080/system/shutdown -H 'X-Verbot-Token: <token>'
+curl -X POST localhost:8080/system/shutdown
 ```
 
 ```json
@@ -361,12 +351,12 @@ Polkit is not an alternative here: a systemd service has no seat or login
 session, so the usual "a local user may power off without sudo" path does not
 apply.
 
-**Two things worth knowing.** The token travels as a plaintext header over
-unencrypted HTTP — acceptable on a home LAN, worth thinking about before
-exposing the robot more widely. And the rest of the API has no authentication
-at all while advertising itself over mDNS, so anything on the network can
-already drive the robot; this endpoint is guarded separately because powering
-the machine off is a different proposition from waving its arms.
+**Worth knowing:** this endpoint is unauthenticated, same as the rest of the
+API, which has none at all while advertising itself over mDNS — anything on
+the network can already drive the robot, and now power it off too. Acceptable
+on a home LAN; worth thinking about before exposing the robot more widely,
+since there is nothing here to stop it beyond the web page's confirmation
+prompt, which a direct `curl` skips entirely.
 
 ## Bring-up checklist
 
@@ -374,9 +364,8 @@ There is a control page at **`http://verbot.local:8080/`** covering every step
 below except the panel buttons: action buttons, a large stop, live status, a
 speak box, live speed sliders, and a log of each request and response. It calls
 the same endpoints as the `curl` commands here, so either works. With
-`VERBOT_SHUTDOWN_TOKEN` set it also offers a shutdown control, which asks for
-the token once and keeps it in that browser rather than embedding it in the
-page.
+`VERBOT_SHUTDOWN_ENABLED=true` it also offers a shutdown control, which asks
+for confirmation in the browser before sending the request.
 
 Work through these in order, with the robot **on a stand with its wheels off
 the ground** until step 5 passes. Keep the schematic open while you do —

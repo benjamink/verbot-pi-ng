@@ -69,16 +69,11 @@ class Settings(BaseSettings):
     # to None to disable.
     ready_pin: int | None = 17
 
-    # Shutdown endpoint. Unset means the route is never registered - see
-    # docs/deployment.md before turning it on.
-    shutdown_token: str | None = None
-
-    @property
-    def shutdown_enabled(self) -> bool:
-        """A blank token is treated as unset, not as a credential an empty
-        header can satisfy. This is the one place that decides "on" so a
-        second, differently-worded check can't drift from it."""
-        return bool(self.shutdown_token and self.shutdown_token.strip())
+    # Shutdown endpoint. False means the route is never registered - see
+    # docs/deployment.md before turning it on. Unauthenticated, like the rest
+    # of the API: anything on the LAN that can reach the robot can already
+    # drive it, so a token here was friction without a matching trade-off.
+    shutdown_enabled: bool = False
 
     # Hardware toggle: False runs entirely on fakes (dev machines).
     use_real_hardware: bool = False

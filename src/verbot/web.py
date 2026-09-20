@@ -156,36 +156,14 @@ if (blinkButton) {
   blinkButton.onclick = async () => { await call('POST', '/system/blink-led'); };
 }
 
-// Present only when a shutdown token is configured, so the route exists.
+// Present only when the shutdown endpoint is enabled, so the route exists.
 const shutdownButton = document.getElementById('shutdown');
 if (shutdownButton) {
-  const KEY = 'verbot-shutdown-token';
   shutdownButton.onclick = async () => {
-    // The token is never served in this page - it lives only in this browser,
-    // so loading the page gives an unauthenticated visitor nothing.
-    let token = localStorage.getItem(KEY);
-    if (!token) {
-      token = prompt('Shutdown token (VERBOT_SHUTDOWN_TOKEN):');
-      if (!token) return;
-      localStorage.setItem(KEY, token);
-    }
     if (!confirm('Power off the Pi?\\n\\nIt will need the physical button to come back.')) return;
 
-    let res;
-    try {
-      res = await fetch('/system/shutdown', {
-        method: 'POST', headers: { 'X-Verbot-Token': token },
-      });
-    } catch (e) {
-      note(`POST /system/shutdown -> ${e}`, true);
-      return;
-    }
-    note(`POST /system/shutdown -> ${res.status} ${await res.text()}`, !res.ok);
-    if (res.status === 401) {
-      localStorage.removeItem(KEY);
-      note('Token rejected and forgotten - you will be asked again.', true);
-    }
-    if (res.ok) {
+    const res = await call('POST', '/system/shutdown');
+    if (res) {
       // Stop polling: the machine is going, and the log would otherwise fill
       // with connection failures.
       clearInterval(pollTimer);
@@ -218,8 +196,8 @@ def render_index(
     )
     shutdown_button = (
         """  <button id="shutdown">Shut down the Pi</button>
-  <p class="hint">Asks for the shutdown token once and keeps it in this
-  browser. The token is never included in this page.</p>
+  <p class="hint">Asks for confirmation, then powers off immediately. It will
+  need the physical button (or a fresh SD boot) to come back.</p>
 """
         if shutdown_enabled
         else ""

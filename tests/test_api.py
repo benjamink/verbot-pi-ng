@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -28,7 +27,7 @@ async def client_rig():
 async def secure_rig():
     """An app with the shutdown endpoint switched on."""
     motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
-    settings = Settings(shutdown_token="correct-horse-battery-staple")
+    settings = Settings(shutdown_enabled=True)
     controller = Controller(motor=motor, switches=switches, settings=settings)
     await controller.start()
     power = FakePower()
@@ -184,7 +183,7 @@ async def test_blink_led_spells_the_word_in_morse(blink_rig, monkeypatch):
     assert ready_signal.history == _expected_morse_history(BLINK_WORD)
 
 
-async def test_shutdown_route_is_absent_without_a_token(client_rig):
+async def test_shutdown_route_is_absent_by_default(client_rig):
     """Not 403 - absent. The capability should not even be advertised."""
     client, *_ = client_rig
     assert (await client.post("/system/shutdown")).status_code == 404
@@ -193,94 +192,20 @@ async def test_shutdown_route_is_absent_without_a_token(client_rig):
     assert "/system/shutdown" not in schema["paths"]
 
 
-@pytest.mark.parametrize("blank_token", ["", "   "])
-async def test_shutdown_route_is_absent_with_a_blank_token(blank_token):
-    """An empty or whitespace token must be treated as unset, not as a real
-    credential that an empty header can satisfy."""
-    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
-    settings = Settings(shutdown_token=blank_token)
-    controller = Controller(motor=motor, switches=switches, settings=settings)
-    await controller.start()
-    power = FakePower()
-    app = create_app(controller=controller, speech=speech, settings=settings, power=power)
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post("/system/shutdown", headers={"X-Verbot-Token": blank_token})
-        assert response.status_code == 404
-        assert power.shutdown_called is False
-
-        schema = (await client.get("/openapi.json")).json()
-        assert "/system/shutdown" not in schema["paths"]
-    await controller.close()
-
-
-async def test_shutdown_rejects_a_missing_token(secure_rig):
+async def test_shutdown_requires_no_credential(secure_rig):
+    """Unauthenticated, like the rest of the API - a bare POST is enough."""
     client, power, _ = secure_rig
     response = await client.post("/system/shutdown")
-    assert response.status_code == 401
-    assert power.shutdown_called is False
-
-
-async def test_shutdown_rejects_a_wrong_token(secure_rig):
-    client, power, _ = secure_rig
-    response = await client.post("/system/shutdown", headers={"X-Verbot-Token": "wrong"})
-    assert response.status_code == 401
-    assert power.shutdown_called is False
-
-
-async def test_shutdown_rejection_is_logged_without_the_token(secure_rig, caplog):
-    """A failed attempt is the one thing on an open LAN worth seeing in
-    journalctl, but the token itself must never end up in the log."""
-    client, power, _ = secure_rig
-    with caplog.at_level(logging.WARNING, logger="verbot.api"):
-        response = await client.post(
-            "/system/shutdown", headers={"X-Verbot-Token": "totally-wrong-token"}
-        )
-    assert response.status_code == 401
-    assert "rejected" in caplog.text.lower() or "shutdown" in caplog.text.lower()
-    assert "totally-wrong-token" not in caplog.text
-
-
-async def test_shutdown_accepts_a_token_padded_with_whitespace(secure_rig):
-    """Real ASGI servers strip optional whitespace from header values per RFC
-    7230; the test transport does not. Stripping both sides here keeps the
-    two in agreement instead of only working under one of them."""
-    client, power, _ = secure_rig
-    response = await client.post(
-        "/system/shutdown", headers={"X-Verbot-Token": "  correct-horse-battery-staple  "}
-    )
     assert response.status_code == 202
     assert power.shutdown_called is True
 
 
-async def test_shutdown_accepts_an_unpadded_token_against_a_padded_configured_one():
-    """`shutdown_enabled` decides on the stripped token; the comparison must
-    use the same stripped value or a padded-in-.env token becomes
-    unauthenticatable."""
-    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
-    settings = Settings(shutdown_token="  correct-horse-battery-staple  ")
-    controller = Controller(motor=motor, switches=switches, settings=settings)
-    await controller.start()
-    power = FakePower()
-    app = create_app(controller=controller, speech=speech, settings=settings, power=power)
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.post(
-            "/system/shutdown", headers={"X-Verbot-Token": "correct-horse-battery-staple"}
-        )
-        assert response.status_code == 202
-        assert power.shutdown_called is True
-    await controller.close()
-
-
-async def test_shutdown_accepts_the_correct_token_and_stops_the_motor(secure_rig):
+async def test_shutdown_stops_the_motor_and_reports_shutting_down(secure_rig):
     client, power, motor = secure_rig
     await client.post("/actions/forwards")
     assert motor.speed != 0
 
-    response = await client.post(
-        "/system/shutdown", headers={"X-Verbot-Token": "correct-horse-battery-staple"}
-    )
+    response = await client.post("/system/shutdown")
 
     assert response.status_code == 202
     assert response.json() == {"status": "shutting down"}
@@ -456,35 +381,13 @@ async def test_page_offers_blink_when_configured(blink_rig):
 
 
 async def test_page_has_no_shutdown_control_when_the_route_is_absent(client_rig):
-    """No token configured means no /system/shutdown route, so no dead button."""
+    """Not enabled means no /system/shutdown route, so no dead button."""
     client, *_ = client_rig
     body = (await client.get("/")).text
     assert 'id="shutdown"' not in body
 
 
-async def test_page_offers_shutdown_when_configured(secure_rig):
+async def test_page_offers_shutdown_when_enabled(secure_rig):
     client, *_ = secure_rig
     body = (await client.get("/")).text
     assert 'id="shutdown"' in body
-
-
-async def test_page_never_embeds_the_shutdown_token(secure_rig):
-    """The page is unauthenticated; serving the token would defeat the guard."""
-    client, *_ = secure_rig
-    body = (await client.get("/")).text
-    assert "correct-horse-battery-staple" not in body
-
-
-@pytest.mark.parametrize("blank_token", ["", "   "])
-async def test_page_has_no_shutdown_control_with_a_blank_token(blank_token):
-    """A blank token must not leave a button pointed at a route that 404s."""
-    motor, switches, speech = FakeMotor(), FakeSwitchBank(), FakeSpeech()
-    settings = Settings(shutdown_token=blank_token)
-    controller = Controller(motor=motor, switches=switches, settings=settings)
-    await controller.start()
-    app = create_app(controller=controller, speech=speech, settings=settings, power=FakePower())
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        body = (await client.get("/")).text
-        assert 'id="shutdown"' not in body
-    await controller.close()

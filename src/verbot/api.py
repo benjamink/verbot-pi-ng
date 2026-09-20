@@ -6,10 +6,9 @@ action is a 422 rather than a silently ignored request.
 
 import asyncio
 import logging
-import secrets
 from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, Request, status
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -237,41 +236,19 @@ def create_app(
             background.add_task(blink_ready_signal, ready_signal)
             return {"status": "blinking"}
 
-    if settings.shutdown_token is not None and not settings.shutdown_enabled:
-        # Blank rather than unset: most likely a `.env` line with nothing
-        # after the `=`. Say so, since the alternative is an operator who
-        # believes the endpoint is armed when it is silently absent.
-        log.warning("shutdown_token is set but blank; /system/shutdown will not be registered")
-
     if settings.shutdown_enabled:
-        # Stripped the same way shutdown_enabled decided "on", so a token
-        # with incidental whitespace in .env compares equal to itself. Real
-        # ASGI servers also strip optional whitespace from header values per
-        # RFC 7230, so stripping the incoming side too keeps the comparison
-        # consistent with what production actually receives.
-        expected = settings.shutdown_token.strip().encode()
 
         @app.post("/system/shutdown", tags=["system"], status_code=status.HTTP_202_ACCEPTED)
         async def shutdown(
-            background: BackgroundTasks,
-            controller: ControllerDep,
-            x_verbot_token: Annotated[str | None, Header()] = None,
+            background: BackgroundTasks, controller: ControllerDep
         ) -> dict[str, str]:
-            """Power the machine off. Requires the configured token.
+            """Power the machine off.
 
-            Registered only when a token is set, so the default deployment has
-            no such route at all rather than a route that always refuses.
+            Registered only when enabled, so the default deployment has no such
+            route at all. Unauthenticated, like the rest of the API - anyone who
+            can reach it can already drive the robot; the web UI's confirm()
+            prompt is a guard against misclicks, not against a hostile network.
             """
-            provided = x_verbot_token.strip().encode() if x_verbot_token is not None else None
-            if provided is None or not secrets.compare_digest(provided, expected):
-                # Worth seeing in journalctl on an open LAN - never the token
-                # itself, which would defeat the point of logging this.
-                log.warning("rejected shutdown attempt: invalid or missing token")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="invalid or missing shutdown token",
-                )
-
             # Stop the robot before the machine goes: systemd's teardown would
             # get there eventually, but not for a few hundred milliseconds, and
             # not at all if the poweroff itself fails.
