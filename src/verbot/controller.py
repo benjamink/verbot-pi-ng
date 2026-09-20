@@ -144,6 +144,8 @@ class Controller:
         completion - e.g. TALK, which must keep running for as long as the
         caller wants the mouth moving), and is ignored.
         """
+        log.info("switch %s %s", action.value, "closed" if activated else "opened")
+
         if self._mode is Mode.INTERROGATING and activated and action is self._desired:
             await self._enter_action(action)
         elif (
